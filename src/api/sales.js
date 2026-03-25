@@ -21,11 +21,12 @@ export const createSale = async (
   tableId,
   referenceNo = null,
 ) => {
+  // Get userId if available (for logged in users), otherwise use guest mode
   const userId =
-    localStorage.getItem("userId") || sessionStorage.getItem("userId");
-  if (!userId) throw new Error("User not logged in - please login again");
+    localStorage.getItem("userId") || sessionStorage.getItem("userId") || null;
+
   const response = await api.post(`/sales`, {
-    userId,
+    ...(userId && { userId }), // Only include userId if available
     paymentMethod,
     items,
     tableId,
@@ -36,14 +37,29 @@ export const createSale = async (
 
 // Get sales with filters
 export const getSales = (params) => {
-  const token = localStorage.getItem("token");
+  return api.get("/sales", { params });
+};
 
-  return axios.get(API_URL + "/sales", {
-    params,
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+// Get sales for current user
+export const getUserSales = async () => {
+  const userId =
+    localStorage.getItem("userId") || sessionStorage.getItem("userId") || null;
+  const response = await api.get("/sales", {
+    params: userId ? { userId } : {},
   });
+  return response;
+};
+
+// Get sales by table number (for guest users)
+export const getSalesByTable = async (tableNumber) => {
+  const response = await api.get(`/sales/by-table/${tableNumber}`);
+  return response.data;
+};
+
+// Update sale status (accept/decline/cancel)
+export const updateSaleStatus = async (saleId, status) => {
+  const response = await api.patch(`/sales/${saleId}/status`, { status });
+  return response.data;
 };
 // Get recent sales
 export const getRecentSales = async (limit = 10) => {

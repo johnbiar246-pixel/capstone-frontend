@@ -154,12 +154,12 @@ const TableGenerator = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="max-w-6xl mx-auto p-6"
+      className="max-w-6xl mx-auto p-4 sm:p-6"
     >
       <motion.h1
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="text-4xl font-bold text-gray-900 mb-8 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+        className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-6 sm:mb-8 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
       >
         Table QR Generator
       </motion.h1>
@@ -179,18 +179,18 @@ const TableGenerator = () => {
         variants={itemVariants}
         initial="hidden"
         animate="visible"
-        className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 mb-8"
+        className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl shadow-lg border border-gray-100 mb-6 sm:mb-8"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <span className="p-3 bg-green-100 rounded-xl">
-            <MdTableRestaurant className="w-6 h-6 text-green-600" />
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <span className="p-2 sm:p-3 bg-green-100 rounded-xl">
+            <MdTableRestaurant className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
           </span>
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             Generate QR Codes for Your Tables
           </h2>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Number of Tables
           </label>
@@ -198,7 +198,7 @@ const TableGenerator = () => {
             type="number"
             value={numberOfTables}
             onChange={(e) => setNumberOfTables(e.target.value)}
-            className="w-96 px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+            className="w-full max-w-md px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
             placeholder="example: 10"
             min="1"
             onKeyPress={(e) => {
@@ -233,17 +233,17 @@ const TableGenerator = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100"
+            className="bg-white p-4 sm:p-6 md:p-8 rounded-2xl shadow-lg border border-gray-100"
           >
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-3 mb-6"
+              className="flex items-center gap-3 mb-4 sm:mb-6"
             >
-              <span className="p-3 bg-blue-100 rounded-xl">
-                <MdQrCode className="w-6 h-6 text-blue-600" />
+              <span className="p-2 sm:p-3 bg-blue-100 rounded-xl">
+                <MdQrCode className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </span>
-              <h2 className="text-xl font-semibold text-gray-800">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
                 Generated QR Codes ({generatedQRs.length} tables)
               </h2>
             </motion.div>
@@ -252,32 +252,39 @@ const TableGenerator = () => {
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
             >
               {generatedQRs.map((qr, index) => (
                 <motion.div
                   key={qr.id || qr.tableNumber}
                   variants={qrCardVariants}
-                  className="flex flex-col items-center p-6 border border-gray-200 rounded-2xl bg-gradient-to-b from-gray-50 to-white hover:shadow-xl transition-all"
-                  whileHover={{ scale: 1.05, y: -5 }}
+                  className="flex flex-col items-center p-4 sm:p-6 border border-gray-200 rounded-2xl bg-gradient-to-b from-gray-50 to-white hover:shadow-xl transition-all"
+                  whileHover={{ scale: 1.02, y: -3 }}
                 >
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: index * 0.05, type: "spring" }}
-                    className="w-32 h-32 bg-white p-2 rounded-xl shadow-sm mb-4"
+                    className="w-28 h-28 sm:w-32 sm:h-32 bg-white p-2 rounded-xl shadow-sm mb-3 sm:mb-4"
                   >
+                    <QRCode
+                      value={qr.url}
+                      size={112}
+                      style={{ width: "100%", height: "100%" }}
+                      className="sm:hidden"
+                    />
                     <QRCode
                       value={qr.url}
                       size={120}
                       style={{ width: "100%", height: "100%" }}
+                      className="hidden sm:block"
                     />
                   </motion.div>
 
-                  <h3 className="text-lg font-bold text-gray-800 mb-1">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-1">
                     Table {qr.tableNumber}
                   </h3>
-                  <p className="text-xs text-gray-500 mb-3 font-mono">
+                  <p className="text-xs text-gray-500 mb-2 sm:mb-3 font-mono break-all text-center px-2">
                     {qr.url}
                   </p>
 
@@ -290,7 +297,7 @@ const TableGenerator = () => {
                       whileTap={{ scale: 0.9 }}
                     >
                       {copiedIndex === index ? (
-                        <span className="text-green-600 text-sm font-medium">
+                        <span className="text-green-600 text-xs sm:text-sm font-medium">
                           ✓ Copied
                         </span>
                       ) : (
@@ -316,9 +323,9 @@ const TableGenerator = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100"
+              className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-100"
             >
-              <p className="text-sm text-blue-800">
+              <p className="text-xs sm:text-sm text-blue-800">
                 <strong>Tip:</strong> Print these QR codes and place them on
                 each table. Customers can scan to view your menu and place
                 orders directly.

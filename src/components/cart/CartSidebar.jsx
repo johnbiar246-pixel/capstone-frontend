@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   MdClose,
   MdRestaurantMenu,
@@ -10,6 +12,8 @@ import {
   MdWineBar,
 } from "react-icons/md";
 import { useCart } from "../../contexts/CartContext";
+import PaymentMethodModal from "../modal/PaymentMethodModal";
+import { getTableByNumber } from "../../api/tables";
 
 const CartSidebar = () => {
   const {
@@ -21,7 +25,74 @@ const CartSidebar = () => {
     getCartTotal,
     getCartItemCount,
     clearCart,
+    placeOrder,
   } = useCart();
+
+  const { isAuthenticated } = useAuth();
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const tableNumber = searchParams.get("table");
+
+  const handlePlaceOrderClick = () => {
+    if (!tableNumber) {
+      alert("Please scan a table QR code first to place an order.");
+      navigate("/scan-table");
+      return;
+    }
+    setShowPaymentModal(true);
+  };
+
+  const [notification, setNotification] = useState(null);
+
+  const showNotification = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handlePaymentConfirm = async (paymentMethod, referenceNo) => {
+    try {
+      // Fetch table data to get the UUID
+      const tableResponse = await getTableByNumber(tableNumber);
+      if (!tableResponse.success || !tableResponse.data) {
+        showNotification("Invalid table. Please scan again.", "error");
+        return;
+      }
+
+      const tableId = tableResponse.data.id; // This is the UUID
+
+      // Create order with payment method (payment will be handled when staff marks as completed)
+      const response = await placeOrder(tableId, paymentMethod, referenceNo);
+
+      if (response.success) {
+        showNotification(
+          "Order placed successfully! Staff will review your order shortly.",
+          "success",
+        );
+        setShowPaymentModal(false);
+        clearCart();
+        closeCart();
+
+        // Redirect to orders page to see the order status
+        setTimeout(() => {
+          navigate("/user/orders");
+        }, 1500);
+      } else {
+        showNotification(
+          response.message || "Failed to place order. Please try again.",
+          "error",
+        );
+      }
+    } catch (error) {
+      console.error("Error placing order:", error);
+      showNotification(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to place order. Please try again.",
+        "error",
+      );
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -176,7 +247,10 @@ const CartSidebar = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <button className="w-full bg-gradient-to-r from-[#F4B860] to-[#e5a950] text-[#3C3D37] py-4 rounded-xl font-bold hover:shadow-lg transition shadow-md flex items-center justify-center gap-2">
+                  <button
+                    onClick={handlePlaceOrderClick}
+                    className="w-full bg-gradient-to-r from-[#F4B860] to-[#e5a950] text-[#3C3D37] py-4 rounded-xl font-bold hover:shadow-lg transition shadow-md flex items-center justify-center gap-2"
+                  >
                     <MdLocalDining />
                     Place Order
                   </button>
@@ -200,6 +274,69 @@ const CartSidebar = () => {
           </motion.div>
         </>
       )}
+
+      {/* Payment Method Modal */}
+      <PaymentMethodModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onConfirm={handlePaymentConfirm}
+        totalAmount={getCartTotal()}
+      />
+
+      {/* Notification Toast */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className={`fixed top-6 left-1/2 z-[60] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${
+              notification.type === "success"
+                ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                : "bg-gradient-to-r from-red-500 to-red-600 text-white"
+            }`}
+          >
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+              {notification.type === "success" ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              )}
+            </div>
+            <p className="font-medium">{notification.message}</p>
+            <button
+              onClick={() => setNotification(null)}
+              className="ml-2 text-white/70 hover:text-white"
+            >
+              <MdClose className="text-xl" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </AnimatePresence>
   );
 };

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { createOrder } from "../api/orders";
 
 const CartContext = createContext();
 
@@ -73,6 +74,36 @@ export const CartProvider = ({ children }) => {
   const closeCart = () => setIsCartOpen(false);
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
+  // Place order function
+  const placeOrder = async (
+    tableId,
+    paymentMethod = null,
+    referenceNo = null,
+  ) => {
+    if (cart.length === 0) {
+      throw new Error("Cart is empty");
+    }
+
+    // Transform cart items to API format
+    const items = cart.map((item) => ({
+      productId: item.id,
+      quantity: item.quantity,
+      price: item.price,
+    }));
+
+    // Call API to create order (not sale yet - will become sale when completed)
+    // Note: For customer orders, paymentMethod and referenceNo are stored but not required
+    const response = await createOrder(items, tableId);
+
+    // Clear cart after successful order
+    if (response.success) {
+      clearCart();
+      closeCart();
+    }
+
+    return response;
+  };
+
   const value = {
     cart,
     isCartOpen,
@@ -85,6 +116,7 @@ export const CartProvider = ({ children }) => {
     openCart,
     closeCart,
     toggleCart,
+    placeOrder,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

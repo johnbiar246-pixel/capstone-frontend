@@ -9,9 +9,13 @@ import {
   MdTableBar,
   MdArrowBack,
   MdRestaurantMenu,
+  MdExpandMore,
+  MdExpandLess,
 } from "react-icons/md";
 import { FaGlassCheers } from "react-icons/fa";
 import { getTableByNumber } from "../../api/tables";
+import { getUserOrders, updateOrderStatus } from "../../api/orders";
+import PaymentMethodModal from "../modal/PaymentMethodModal";
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -21,30 +25,19 @@ const Orders = () => {
   const [tableData, setTableData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
 
-  const [orders, setOrders] = useState([
-    {
-      id: "1",
-      details: "2x Burger, 1x Fries",
-      total: 350,
-      status: "pending",
-      time: "10:30 AM",
-    },
-    {
-      id: "2",
-      details: "1x Pizza, 2x Coke",
-      total: 420,
-      status: "ready",
-      time: "10:25 AM",
-    },
-    {
-      id: "3",
-      details: "3x Salad, 1x Water",
-      total: 280,
-      status: "completed",
-      time: "10:15 AM",
-    },
-  ]);
+  // Payment modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Dropdown states for order categories
+  const [expandedSections, setExpandedSections] = useState({
+    upcoming: true, // pending orders
+    preparing: true, // preparing orders
+    completed: false, // completed orders
+  });
 
   // Fetch table data when tableNumber is present in URL
   useEffect(() => {
@@ -52,6 +45,45 @@ const Orders = () => {
       fetchTableData(tableNumber);
     }
   }, [tableNumber]);
+
+  // Fetch orders from API
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const response = await getUserOrders();
+      if (response.data && response.data.success) {
+        // Transform API data to match component format
+        const transformedOrders = response.data.data.map((order) => ({
+          id: order.id.toString(),
+          orderNumber: order.orderNumber,
+          details: order.orderItems
+            .map((item) => `${item.quantity}x ${item.product?.name || "Item"}`)
+            .join(", "),
+          total: order.orderItems.reduce(
+            (sum, item) => sum + item.price * item.quantity,
+            0,
+          ),
+          status: order.status?.toLowerCase() || "pending",
+          time: new Date(order.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          tableId: order.tableId,
+          paymentMethod: order.paymentMethod,
+          referenceNo: order.referenceNo,
+        }));
+        setOrders(transformedOrders);
+      }
+    } catch (err) {
+      console.error("Error fetching orders:", err);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   const fetchTableData = async (number) => {
     setLoading(true);
@@ -80,16 +112,138 @@ const Orders = () => {
     navigate("/user/orders");
   };
 
-  const handleAccept = (orderId) => {
-    setOrders(
-      orders.map((order) =>
-        order.id === orderId ? { ...order, status: "ready" } : order,
-      ),
-    );
+  const handleAcceptClick = (orderId) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (order.status === "pending") {
+      // Open payment modal for pending orders
+      setSelectedOrder(order);
+      setShowPaymentModal(true);
+    } else if (order.status === "preparing") {
+      // Directly complete preparing orders (payment method already stored)
+      handleCompleteOrder(orderId);
+    }
   };
 
-  const handleCancel = (orderId) => {
-    setOrders(orders.filter((order) => order.id !== orderId));
+  const handlePaymentConfirm = async (paymentMethod, referenceNo) => {
+    if (!selectedOrder) return;
+
+    // Check if user is authenticated
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to accept orders.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await updateOrderStatus(
+        selectedOrder.id,
+        "PREPARING",
+        paymentMethod,
+        referenceNo,
+      );
+      if (response.success) {
+        setOrders(
+          orders.map((order) =>
+            order.id === selectedOrder.id
+              ? { ...order, status: "preparing", paymentMethod, referenceNo }
+              : order,
+          ),
+        );
+        setShowPaymentModal(false);
+        setSelectedOrder(null);
+      } else {
+        alert(response.message || "Failed to accept order");
+      }
+    } catch (err) {
+      console.error("Error accepting order:", err);
+
+      // Use error message from axios interceptor if available
+      let errorMessage =
+        err.message || "Failed to accept order. Please try again.";
+
+      // Handle specific auth errors
+      if (err.response?.status === 401) {
+        setTimeout(() => navigate("/login"), 2000);
+      }
+
+      alert(errorMessage);
+    }
+  };
+
+  const handleCompleteOrder = async (orderId) => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to complete orders.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const order = orders.find((o) => o.id === orderId);
+      // Use stored payment method when completing
+      const response = await updateOrderStatus(
+        orderId,
+        "COMPLETED",
+        order.paymentMethod,
+        order.referenceNo,
+      );
+      if (response.success) {
+        setOrders(
+          orders.map((order) =>
+            order.id === orderId ? { ...order, status: "completed" } : order,
+          ),
+        );
+      } else {
+        alert(response.message || "Failed to complete order");
+      }
+    } catch (err) {
+      console.error("Error completing order:", err);
+
+      // Use error message from axios interceptor if available
+      let errorMessage =
+        err.message || "Failed to complete order. Please try again.";
+
+      // Handle specific auth errors
+      if (err.response?.status === 401) {
+        setTimeout(() => navigate("/login"), 2000);
+      }
+
+      alert(errorMessage);
+    }
+  };
+
+  const handleCancel = async (orderId) => {
+    // Check if user is authenticated
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to cancel orders.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await updateOrderStatus(orderId, "CANCELLED");
+      if (response.success) {
+        setOrders(orders.filter((order) => order.id !== orderId));
+      } else {
+        alert(response.message || "Failed to cancel order");
+      }
+    } catch (err) {
+      console.error("Error cancelling order:", err);
+
+      // Use error message from axios interceptor if available
+      let errorMessage =
+        err.message || "Failed to cancel order. Please try again.";
+
+      // Handle specific auth errors
+      if (err.response?.status === 401) {
+        setTimeout(() => navigate("/login"), 2000);
+      }
+
+      alert(errorMessage);
+    }
   };
 
   const containerVariants = {
@@ -113,10 +267,12 @@ const Orders = () => {
     switch (status) {
       case "pending":
         return "bg-yellow-100 text-yellow-800";
-      case "ready":
-        return "bg-green-100 text-green-800";
+      case "preparing":
+        return "bg-orange-100 text-orange-800";
       case "completed":
         return "bg-blue-100 text-blue-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -126,13 +282,189 @@ const Orders = () => {
     switch (status) {
       case "pending":
         return <MdAccessTime className="w-4 h-4" />;
-      case "ready":
-        return <MdCheck className="w-4 h-4" />;
+      case "preparing":
+        return <MdAccessTime className="w-4 h-4" />;
       case "completed":
         return <MdCheck className="w-4 h-4" />;
+      case "cancelled":
+        return <MdClose className="w-4 h-4" />;
       default:
         return null;
     }
+  };
+
+  // Toggle dropdown sections
+  const toggleSection = (section) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  // Filter orders by status
+  const upcomingOrders = orders.filter((order) => order.status === "pending");
+  const preparingOrders = orders.filter(
+    (order) => order.status === "preparing",
+  );
+  const completedOrders = orders.filter(
+    (order) => order.status === "completed",
+  );
+
+  // Render order card component
+  const renderOrderCard = (order) => (
+    <motion.div
+      key={order.id}
+      variants={itemVariants}
+      whileHover={{ scale: 1.01 }}
+      className="border border-gray-200 p-3 sm:p-4 rounded-xl hover:shadow-md transition-all bg-gradient-to-r from-gray-50 to-white"
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold text-xs sm:text-sm">
+            #{order.orderNumber || order.id.slice(-4)}
+          </span>
+          <div>
+            <p className="font-semibold text-gray-900 text-sm sm:text-base">
+              Order #{order.orderNumber || order.id.slice(-4)}
+            </p>
+            <p className="text-xs sm:text-sm text-gray-500">{order.time}</p>
+          </div>
+        </div>
+        <span
+          className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-medium flex items-center gap-1 ${getStatusColor(order.status)}`}
+        >
+          {getStatusIcon(order.status)}
+          <span className="hidden sm:inline">
+            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+          </span>
+        </span>
+      </div>
+
+      <p className="text-gray-700 mb-2 text-sm">{order.details}</p>
+
+      {/* Payment Method Badge */}
+      {order.paymentMethod && (
+        <div className="mb-2">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+              order.paymentMethod === "CASH"
+                ? "bg-green-100 text-green-800"
+                : "bg-blue-100 text-blue-800"
+            }`}
+          >
+            {order.paymentMethod}
+          </span>
+        </div>
+      )}
+
+      <p className="text-base sm:text-lg font-bold text-green-600 mb-2">
+        Total: ₱{order.total.toFixed(2)}
+      </p>
+
+      {/* Action Buttons - Smaller on mobile */}
+      {(order.status === "pending" || order.status === "preparing") && (
+        <div className="flex gap-2 mt-2">
+          {order.status === "pending" ? (
+            <>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleAcceptClick(order.id)}
+                className="flex-1 px-2 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-1"
+              >
+                <MdCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Accept</span>
+                <span className="sm:hidden">Accept</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => handleCancel(order.id)}
+                className="flex-1 px-2 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center gap-1"
+              >
+                <MdClose className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Cancel</span>
+                <span className="sm:hidden">Cancel</span>
+              </motion.button>
+            </>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => handleAcceptClick(order.id)}
+              className="w-full px-2 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all flex items-center justify-center gap-1"
+            >
+              <MdCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Mark as Completed</span>
+              <span className="sm:hidden">Complete</span>
+            </motion.button>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+
+  // Render dropdown section
+  const renderDropdownSection = (title, ordersList, sectionKey, iconColor) => {
+    const isExpanded = expandedSections[sectionKey];
+    const count = ordersList.length;
+
+    return (
+      <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
+        <button
+          onClick={() => toggleSection(sectionKey)}
+          className="w-full flex items-center justify-between p-3 sm:p-4 bg-gray-50 hover:bg-gray-100 transition-all"
+        >
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className={`p-2 ${iconColor} rounded-lg`}>
+              <FaGlassCheers className="w-4 h-4 sm:w-5 sm:h-5" />
+            </span>
+            <div className="text-left">
+              <h3 className="font-semibold text-gray-800 text-sm sm:text-base">
+                {title}
+              </h3>
+              <p className="text-xs text-gray-500">
+                {count} {count === 1 ? "order" : "orders"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {count > 0 && (
+              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded-full text-xs font-medium">
+                {count}
+              </span>
+            )}
+            {isExpanded ? (
+              <MdExpandLess className="w-5 h-5 text-gray-500" />
+            ) : (
+              <MdExpandMore className="w-5 h-5 text-gray-500" />
+            )}
+          </div>
+        </button>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="p-3 sm:p-4 space-y-3 bg-white">
+                {ordersList.length === 0 ? (
+                  <p className="text-gray-400 text-center py-4 text-sm">
+                    No {title.toLowerCase()} available
+                  </p>
+                ) : (
+                  ordersList.map((order) => renderOrderCard(order))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
   };
 
   return (
@@ -201,87 +533,79 @@ const Orders = () => {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100"
+        className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-lg border border-gray-100"
       >
-        <div className="flex items-center gap-3 mb-6">
-          <span className="p-3 bg-blue-100 rounded-xl">
-            <FaGlassCheers className="w-6 h-6 text-blue-600" />
+        <div className="flex items-center gap-3 mb-4 sm:mb-6">
+          <span className="p-2 sm:p-3 bg-blue-100 rounded-xl">
+            <FaGlassCheers className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
           </span>
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
             Current Orders
           </h2>
         </div>
 
-        <div className="space-y-4">
-          {orders.length === 0 ? (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-gray-500 text-center py-8"
-            >
-              No orders available.
-            </motion.p>
-          ) : (
-            orders.map((order) => (
-              <motion.div
-                key={order.id}
-                variants={itemVariants}
-                whileHover={{ scale: 1.01 }}
-                className="border border-gray-200 p-5 rounded-xl hover:shadow-md transition-all bg-gradient-to-r from-gray-50 to-white"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 font-bold">
-                      #{order.id}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        Order #{order.id}
-                      </p>
-                      <p className="text-sm text-gray-500">{order.time}</p>
-                    </div>
-                  </div>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 ${getStatusColor(order.status)}`}
-                  >
-                    {getStatusIcon(order.status)}
-                    {order.status.charAt(0).toUpperCase() +
-                      order.status.slice(1)}
-                  </span>
-                </div>
+        {ordersLoading ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center py-8"
+          >
+            <motion.div
+              className="h-8 w-8 border-4 border-[#254F22] border-t-transparent rounded-full mx-auto mb-4"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            />
+            <p className="text-gray-500">Loading orders...</p>
+          </motion.div>
+        ) : orders.length === 0 ? (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-gray-500 text-center py-8"
+          >
+            No orders available.
+          </motion.p>
+        ) : (
+          <div className="space-y-3 sm:space-y-4">
+            {/* Upcoming Orders Dropdown (Pending) */}
+            {renderDropdownSection(
+              "Upcoming Orders",
+              upcomingOrders,
+              "upcoming",
+              "bg-yellow-100 text-yellow-600",
+            )}
 
-                <p className="text-gray-700 mb-2">{order.details}</p>
-                <p className="text-lg font-bold text-green-600 mb-3">
-                  Total: ₱{order.total.toFixed(2)}
-                </p>
+            {/* Preparing Orders Dropdown */}
+            {renderDropdownSection(
+              "Preparing Orders",
+              preparingOrders,
+              "preparing",
+              "bg-orange-100 text-orange-600",
+            )}
 
-                {order.status === "pending" && (
-                  <div className="flex gap-3 mt-3">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleAccept(order.id)}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-lg hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2"
-                    >
-                      <MdCheck className="w-5 h-5" />
-                      Accept
-                    </motion.button>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleCancel(order.id)}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center gap-2"
-                    >
-                      <MdClose className="w-5 h-5" />
-                      Cancel
-                    </motion.button>
-                  </div>
-                )}
-              </motion.div>
-            ))
-          )}
-        </div>
+            {/* Completed Orders Dropdown */}
+            {renderDropdownSection(
+              "Completed Orders",
+              completedOrders,
+              "completed",
+              "bg-blue-100 text-blue-600",
+            )}
+          </div>
+        )}
       </motion.div>
+
+      {/* Payment Method Modal */}
+      <PaymentMethodModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedOrder(null);
+        }}
+        onConfirm={handlePaymentConfirm}
+        totalAmount={selectedOrder?.total || 0}
+        mode="staff"
+        orderId={selectedOrder?.id}
+      />
     </motion.div>
   );
 };

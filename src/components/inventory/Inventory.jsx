@@ -287,7 +287,7 @@ const Inventory = () => {
         animate="visible"
         className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100"
       >
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
           <div className="flex items-center gap-3">
             <span className="p-3 bg-purple-100 rounded-xl">
               <MdInventory className="w-6 h-6 text-purple-600" />
@@ -296,9 +296,9 @@ const Inventory = () => {
               Stock Levels
             </h2>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <label className="font-semibold text-gray-700 text-sm">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <label className="font-semibold text-gray-700 text-sm hidden sm:block">
                 Filter:
               </label>
               <input
@@ -306,47 +306,50 @@ const Inventory = () => {
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 max-w-md px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                className="flex-1 sm:max-w-md px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
               />
-              <select
-                value={selectedCategory || ""}
-                onChange={(e) => setSelectedCategory(e.target.value || null)}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-              >
-                <option value="">All</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={`${sortField}:${sortDir}`}
-                onChange={(e) => {
-                  const [field, dir] = e.target.value.split(":");
-                  setSortField(field);
-                  setSortDir(dir);
-                }}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-              >
-                <option value="name:asc">Name A-Z</option>
-                <option value="name:desc">Name Z-A</option>
-                <option value="stock:asc">Stock Low-High</option>
-                <option value="stock:desc">Stock High-Low</option>
-                <option value="price:asc">Price Low-High</option>
-                <option value="price:desc">Price High-Low</option>
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={selectedCategory || ""}
+                  onChange={(e) => setSelectedCategory(e.target.value || null)}
+                  className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                >
+                  <option value="">All Categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={`${sortField}:${sortDir}`}
+                  onChange={(e) => {
+                    const [field, dir] = e.target.value.split(":");
+                    setSortField(field);
+                    setSortDir(dir);
+                  }}
+                  className="flex-1 sm:flex-none px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                >
+                  <option value="name:asc">Name A-Z</option>
+                  <option value="name:desc">Name Z-A</option>
+                  <option value="stock:asc">Stock Low-High</option>
+                  <option value="stock:desc">Stock High-Low</option>
+                  <option value="price:asc">Price Low-High</option>
+                  <option value="price:desc">Price High-Low</option>
+                </select>
+              </div>
             </div>
 
             {isAdmin && (
               <motion.button
                 onClick={handleAddProduct}
-                className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all flex items-center gap-2 shadow-lg"
+                className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg whitespace-nowrap"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
                 <MdAdd className="w-5 h-5" />
-                Add Product
+                <span className="hidden sm:inline">Add Product</span>
+                <span className="sm:hidden">Add</span>
               </motion.button>
             )}
           </div>
@@ -425,10 +428,10 @@ const Inventory = () => {
                       </div>
                     </div>
                     {isAdmin && (
-                      <div className="flex gap-2 absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-2 absolute top-3 right-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         <motion.button
                           onClick={() => handleEdit(item)}
-                          className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all"
+                          className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-md"
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.95 }}
                           title="Edit"
@@ -437,7 +440,7 @@ const Inventory = () => {
                         </motion.button>
                         <motion.button
                           onClick={() => handleDelete(item.id)}
-                          className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all"
+                          className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all shadow-md"
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.95 }}
                           title="Delete"
@@ -461,23 +464,23 @@ const Inventory = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white p-8 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              <div className="flex justify-between items-center mb-4 sm:mb-8">
+                <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
                   Add New Product
                 </h2>
                 <button
                   onClick={handleCloseModal}
                   className="p-2 hover:bg-gray-100 rounded-2xl transition-all"
                 >
-                  <MdClose className="w-7 h-7 text-gray-500" />
+                  <MdClose className="w-6 h-6 sm:w-7 sm:h-7 text-gray-500" />
                 </button>
               </div>
 
@@ -626,23 +629,23 @@ const Inventory = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white p-8 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             >
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <div className="flex justify-between items-center mb-4 sm:mb-8">
+                <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   Edit Product
                 </h2>
                 <button
                   onClick={handleCloseEditModal}
                   className="p-2 hover:bg-gray-100 rounded-2xl transition-all"
                 >
-                  <MdClose className="w-7 h-7 text-gray-500" />
+                  <MdClose className="w-6 h-6 sm:w-7 sm:h-7 text-gray-500" />
                 </button>
               </div>
 

@@ -6,22 +6,10 @@ import {
   MdInventory,
   MdTableChart,
   MdPersonAdd,
-  MdLogout,
   MdTrendingUp,
   MdMenu,
   MdClose,
 } from "react-icons/md";
-
-const logout = async () => {
-  try {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-  } catch {
-    // ignore
-  }
-  localStorage.clear();
-  sessionStorage.clear();
-  window.location.href = "/login";
-};
 
 const menuItems = [
   { id: "create-user", label: "Create User", icon: MdPersonAdd },
@@ -51,34 +39,36 @@ const AdminSidebar = () => {
 
   return (
     <>
+      {/* Mobile Floating Toggle Button */}
       {isMobile && (
-        <div className="sticky top-0 z-40 bg-[#3C3D37] border-b border-[#254F22]/40 px-4 py-3 flex items-center justify-between">
-          <h2 className="font-bold text-white text-lg">Gulp Course</h2>
-          <button
-            onClick={toggleSidebar}
-            className="inline-flex items-center justify-center p-2 rounded-md bg-[#254F22] text-white hover:bg-[#1e3f1c] transition"
-          >
-            {isSidebarOpen ? <MdClose size={22} /> : <MdMenu size={22} />}
-          </button>
-        </div>
+        <motion.button
+          onClick={toggleSidebar}
+          className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-[#254F22] text-white shadow-lg hover:bg-[#1e3f1c] transition-colors"
+          whileTap={{ scale: 0.9 }}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        >
+          {isSidebarOpen ? <MdClose size={24} /> : <MdMenu size={24} />}
+        </motion.button>
       )}
 
+      {/* Backdrop for mobile */}
       <AnimatePresence>
         {isMobile && isSidebarOpen && (
-          <motion.button
-            type="button"
-            aria-label="Close sidebar backdrop"
+          <motion.div
             onClick={closeSidebar}
             className="fixed inset-0 bg-black/50 z-40"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           />
         )}
       </AnimatePresence>
 
       <motion.aside
-        className={`bg-gradient-to-b from-[#3C3D37]/95 to-[#2a2b25]/95 backdrop-blur-md border-r border-[#254F22]/30 shadow-2xl z-50 ${
+        className={`bg-[#3C3D37] border-r border-[#254F22]/40 shadow-2xl z-50 ${
           isMobile ? "fixed top-0 left-0 h-screen" : "sticky top-0 min-h-screen"
         }`}
         initial={false}
@@ -90,26 +80,31 @@ const AdminSidebar = () => {
         transition={{ type: "spring", stiffness: 220, damping: 24 }}
       >
         <div className="p-4 md:p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-6 md:mb-8 relative">
-            <motion.h2
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="font-bold text-white text-xl md:text-2xl"
-            >
-              Gulp Course
-            </motion.h2>
-            {isMobile && (
+          {/* Mobile Close Button in Sidebar Header */}
+          {isMobile && (
+            <div className="flex items-center justify-between mb-6 md:mb-8">
+              <span className="text-white font-bold text-lg">
+                Administrator
+              </span>
               <button
                 onClick={closeSidebar}
-                className="p-2 rounded-md text-white hover:bg-white/10"
+                className="p-2 rounded-md text-white hover:bg-white/10 transition-colors"
               >
-                <MdClose size={20} />
+                <MdClose size={24} />
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          <nav className="space-y-2 flex-1">
+          {/* Desktop Header */}
+          {!isMobile && (
+            <div className="mb-6 md:mb-8">
+              <span className="text-white font-bold text-lg hidden md:block">
+                Administrator
+              </span>
+            </div>
+          )}
+
+          <nav className="space-y-2 flex-1 pt-2">
             {menuItems.map((item, index) => {
               const Icon = item.icon;
               return (
@@ -152,26 +147,6 @@ const AdminSidebar = () => {
               );
             })}
           </nav>
-
-          <div className="mt-auto pt-4 border-t border-gray-700/50 sticky bottom-0 bg-gradient-to-b from-transparent to-[#2a2b25]/95">
-            <motion.button
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              onClick={() => logout()}
-              className="w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center group text-red-300 hover:bg-red-500/30 hover:text-red-100"
-              whileHover={{ scale: 1.02, x: 4 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <motion.span
-                whileHover={{ scale: 1.08 }}
-                transition={{ type: "spring", stiffness: 400 }}
-              >
-                <MdLogout className="mr-3 text-xl" />
-              </motion.span>
-              <span className="font-medium">Logout</span>
-            </motion.button>
-          </div>
         </div>
       </motion.aside>
     </>

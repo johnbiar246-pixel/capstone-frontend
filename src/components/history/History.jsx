@@ -335,11 +335,12 @@ const History = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
+      className="px-4 sm:px-6 lg:px-8"
     >
       <motion.h1
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="text-4xl font-bold text-gray-900 mb-8 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
+        className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-4 sm:mb-6 lg:mb-8 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
       >
         Sales
       </motion.h1>
@@ -348,10 +349,10 @@ const History = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-8"
+        className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100 mb-6 sm:mb-8"
       >
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 flex-1">
+        <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-end lg:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 flex-1">
             {/* Date From */}
             <div className="flex flex-col">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
@@ -544,46 +545,46 @@ const History = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 mb-8"
+        className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-lg border border-gray-100 mb-6 sm:mb-8"
       >
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="p-3 bg-green-100 rounded-xl">
-              <MdCalendarToday className="w-6 h-6 text-green-600" />
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="p-2 sm:p-3 bg-green-100 rounded-xl">
+              <MdCalendarToday className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
             </span>
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
               Today's Sales Summary
             </h2>
           </div>
         </div>
 
         {todaySales.length > 0 ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-green-50 p-6 rounded-xl border border-green-100">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="bg-green-50 p-4 sm:p-6 rounded-xl border border-green-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
                   Total Sales
                 </h3>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600">
                   ₱
                   {todaySales
                     .reduce((sum, sale) => sum + sale.totalAmount, 0)
                     .toLocaleString()}
                 </p>
               </div>
-              <div className="bg-blue-50 p-6 rounded-xl border border-blue-100">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <div className="bg-blue-50 p-4 sm:p-6 rounded-xl border border-blue-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
                   Number of Transactions
                 </h3>
-                <p className="text-3xl font-bold text-blue-600">
+                <p className="text-2xl sm:text-3xl font-bold text-blue-600">
                   {todaySales.length}
                 </p>
               </div>
-              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <div className="bg-purple-50 p-4 sm:p-6 rounded-xl border border-purple-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
                   Average Transaction
                 </h3>
-                <p className="text-3xl font-bold text-purple-600">
+                <p className="text-2xl sm:text-3xl font-bold text-purple-600">
                   ₱
                   {(
                     todaySales.reduce(
@@ -596,36 +597,36 @@ const History = () => {
             </div>
 
             {/* Top Products Today */}
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <MdLocalOffer className="w-5 h-5 text-amber-500" />
+            <div className="mt-6 sm:mt-8">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
+                <MdLocalOffer className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
                 Top Products Today
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b-2 border-gray-200">
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                      <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
                         Product
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-gray-700">
-                        Quantity
+                      <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
+                        Qty
                       </th>
-                      <th className="text-right py-3 px-4 font-semibold text-gray-700">
-                        Total Sales
+                      <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
+                        Total
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {todayProductSummary.slice(0, 5).map((product, index) => (
                       <tr key={product.id} className="border-b border-gray-100">
-                        <td className="py-3 px-4 font-medium text-gray-900">
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 font-medium text-gray-900 text-sm sm:text-base">
                           {product.name}
                         </td>
-                        <td className="py-3 px-4 text-right text-gray-700">
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-gray-700 text-sm sm:text-base">
                           {product.quantity}
                         </td>
-                        <td className="py-3 px-4 text-right font-semibold text-green-600">
+                        <td className="py-2 sm:py-3 px-2 sm:px-4 text-right font-semibold text-green-600 text-sm sm:text-base">
                           ₱{product.totalSales.toLocaleString()}
                         </td>
                       </tr>
@@ -634,7 +635,7 @@ const History = () => {
                       <tr>
                         <td
                           colSpan={3}
-                          className="py-6 text-center text-gray-500"
+                          className="py-4 sm:py-6 text-center text-gray-500 text-sm sm:text-base"
                         >
                           No products sold today
                         </td>
@@ -646,7 +647,7 @@ const History = () => {
             </div>
           </div>
         ) : (
-          <div className="py-8 text-center text-gray-500">
+          <div className="py-6 sm:py-8 text-center text-gray-500 text-sm sm:text-base">
             No sales recorded today
           </div>
         )}
@@ -656,42 +657,42 @@ const History = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 mb-8"
+        className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-lg border border-gray-100 mb-6 sm:mb-8"
       >
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="p-3 bg-indigo-100 rounded-xl">
-              <MdHistory className="w-6 h-6 text-indigo-600" />
+        <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="p-2 sm:p-3 bg-indigo-100 rounded-xl">
+              <MdHistory className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-600" />
             </span>
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
               Sales Details ({filteredSales.length})
             </h2>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b-2 border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600 text-sm sm:text-base whitespace-nowrap">
                   Date
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base whitespace-nowrap">
                   User
                 </th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base whitespace-nowrap">
                   Table
                 </th>
-                <th className="py-3 px-4 font-semibold text-gray-700">
+                <th className="py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base whitespace-nowrap">
                   Payment
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base whitespace-nowrap">
                   Items
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600">
+                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600 text-sm sm:text-base whitespace-nowrap">
                   Total
                 </th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                <th className="text-center py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base whitespace-nowrap">
                   Details
                 </th>
               </tr>
@@ -705,17 +706,19 @@ const History = () => {
                     transition={{ delay: index * 0.02 }}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="py-4 px-4 font-medium text-gray-900">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-xs sm:text-sm whitespace-nowrap">
                       {new Date(sale.createdAt).toLocaleDateString()}{" "}
-                      {new Date(sale.createdAt).toLocaleTimeString()}
+                      <span className="hidden sm:inline">
+                        {new Date(sale.createdAt).toLocaleTimeString()}
+                      </span>
                     </td>
-                    <td className="py-4 px-4 text-gray-700">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm whitespace-nowrap">
                       {sale.user?.name || "N/A"}
                     </td>
-                    <td className="py-4 px-4 text-gray-700">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm whitespace-nowrap">
                       {sale.table ? `Table ${sale.table.number}` : "Takeaway"}
                     </td>
-                    <td className="py-4 px-4">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
                           sale.paymentMethod === "CASH"
@@ -726,21 +729,21 @@ const History = () => {
                         {sale.paymentMethod}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right text-gray-700">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-right text-gray-700 text-xs sm:text-sm">
                       {sale.saleItems?.length || 0}
                     </td>
-                    <td className="py-4 px-4 text-right font-semibold text-green-600">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-right font-semibold text-green-600 text-xs sm:text-sm whitespace-nowrap">
                       ₱{sale.totalAmount.toLocaleString()}
                     </td>
-                    <td className="py-4 px-4 text-center">
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
                       <button
                         onClick={() => toggleSaleExpand(sale.id)}
-                        className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                        className="p-1.5 sm:p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
                       >
                         {expandedSales[sale.id] ? (
-                          <MdExpandLess className="w-5 h-5 text-gray-700" />
+                          <MdExpandLess className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
                         ) : (
-                          <MdExpandMore className="w-5 h-5 text-gray-700" />
+                          <MdExpandMore className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700" />
                         )}
                       </button>
                     </td>
@@ -749,21 +752,21 @@ const History = () => {
                   {/* Expanded Product Details */}
                   {expandedSales[sale.id] && (
                     <tr className="bg-gray-50">
-                      <td colSpan={7} className="py-4 px-6">
+                      <td colSpan={7} className="py-3 sm:py-4 px-3 sm:px-6">
                         <div className="rounded-xl border border-gray-200 overflow-hidden">
                           <table className="w-full">
                             <thead className="bg-gray-100">
                               <tr>
-                                <th className="text-left py-2 px-4 text-sm font-medium text-gray-700">
+                                <th className="text-left py-2 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-700">
                                   Product
                                 </th>
-                                <th className="text-right py-2 px-4 text-sm font-medium text-gray-700">
-                                  Quantity
+                                <th className="text-right py-2 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-700">
+                                  Qty
                                 </th>
-                                <th className="text-right py-2 px-4 text-sm font-medium text-gray-700">
+                                <th className="text-right py-2 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-700 hidden sm:table-cell">
                                   Unit Price
                                 </th>
-                                <th className="text-right py-2 px-4 text-sm font-medium text-gray-700">
+                                <th className="text-right py-2 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-700">
                                   Subtotal
                                 </th>
                               </tr>
@@ -774,16 +777,16 @@ const History = () => {
                                   key={item.id}
                                   className="border-t border-gray-100"
                                 >
-                                  <td className="py-3 px-4 text-sm font-medium text-gray-900">
+                                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-900">
                                     {item.product?.name || "Unknown Product"}
                                   </td>
-                                  <td className="py-3 px-4 text-right text-sm text-gray-700">
+                                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm text-gray-700">
                                     {item.quantity}
                                   </td>
-                                  <td className="py-3 px-4 text-right text-sm text-gray-700">
+                                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm text-gray-700 hidden sm:table-cell">
                                     ₱{item.price.toLocaleString()}
                                   </td>
-                                  <td className="py-3 px-4 text-right text-sm font-semibold text-green-600">
+                                  <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-semibold text-green-600">
                                     ₱
                                     {(
                                       item.price * item.quantity
@@ -794,11 +797,11 @@ const History = () => {
                               <tr className="border-t border-gray-200 bg-gray-50">
                                 <td
                                   colSpan={3}
-                                  className="py-3 px-4 text-right text-sm font-semibold text-gray-800"
+                                  className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-semibold text-gray-800"
                                 >
                                   Total:
                                 </td>
-                                <td className="py-3 px-4 text-right text-sm font-bold text-green-600">
+                                <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-bold text-green-600">
                                   ₱{sale.totalAmount.toLocaleString()}
                                 </td>
                               </tr>
@@ -812,7 +815,10 @@ const History = () => {
               ))}
               {filteredSales.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="py-8 sm:py-12 text-center text-gray-500 text-sm sm:text-base"
+                  >
                     {rawSales.length === 0
                       ? "No sales created yet. Create some in Cashier!"
                       : "No sales match current filters"}
@@ -829,27 +835,27 @@ const History = () => {
         variants={itemVariants}
         initial="hidden"
         animate="visible"
-        className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100"
+        className="bg-white p-4 sm:p-6 lg:p-8 rounded-2xl shadow-lg border border-gray-100"
       >
-        <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="p-3 bg-purple-100 rounded-xl">
-              <MdHistory className="w-6 h-6 text-purple-600" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="p-2 sm:p-3 bg-purple-100 rounded-xl">
+              <MdHistory className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
             </span>
-            <h2 className="text-xl font-semibold text-gray-800">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">
               Monthly Breakdown
             </h2>
-            <div className="inline-flex items-center gap-3 rounded-xl bg-green-50 border border-green-100 px-4 py-2 ml-2">
-              <span className="text-sm font-medium text-gray-700">
-                Total Revenue (Month):
+            <div className="inline-flex items-center gap-2 sm:gap-3 rounded-xl bg-green-50 border border-green-100 px-3 sm:px-4 py-2 ml-0 sm:ml-2">
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
+                Total Revenue:
               </span>
-              <span className="text-lg font-bold text-green-600">
+              <span className="text-base sm:text-lg font-bold text-green-600">
                 ₱{monthlyTotalRevenue.toLocaleString()}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <select
               value={breakdownFilters.scope}
               onChange={(e) =>
@@ -858,7 +864,7 @@ const History = () => {
                   scope: e.target.value,
                 }))
               }
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+              className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm"
             >
               <option value="all">All Time</option>
               <option value="month">Specific Month</option>
@@ -874,7 +880,7 @@ const History = () => {
                       year: Number(e.target.value),
                     }))
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                  className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm"
                 >
                   {Array.from(
                     { length: new Date().getFullYear() - 2026 + 1 },
@@ -897,7 +903,7 @@ const History = () => {
                       month: Number(e.target.value),
                     }))
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm"
+                  className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm"
                 >
                   {[
                     "January",
@@ -924,19 +930,19 @@ const History = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[500px]">
             <thead>
               <tr className="border-b-2 border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
                   Month
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
                   Orders
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">
-                  Total Revenue
+                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
+                  Revenue
                 </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
                   Avg. Order
                 </th>
               </tr>
@@ -950,16 +956,16 @@ const History = () => {
                   transition={{ delay: index * 0.1 }}
                   className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                 >
-                  <td className="py-4 px-4 font-medium text-gray-900">
+                  <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-xs sm:text-sm">
                     {month.month}
                   </td>
-                  <td className="py-4 px-4 text-right text-gray-700">
+                  <td className="py-3 sm:py-4 px-2 sm:px-4 text-right text-gray-700 text-xs sm:text-sm">
                     {month.orders}
                   </td>
-                  <td className="py-4 px-4 text-right font-semibold text-green-600">
+                  <td className="py-3 sm:py-4 px-2 sm:px-4 text-right font-semibold text-green-600 text-xs sm:text-sm whitespace-nowrap">
                     ₱{month.sales.toLocaleString()}
                   </td>
-                  <td className="py-4 px-4 text-right text-gray-600">
+                  <td className="py-3 sm:py-4 px-2 sm:px-4 text-right text-gray-600 text-xs sm:text-sm whitespace-nowrap">
                     ₱{(month.sales / month.orders).toFixed(2)}
                   </td>
                 </motion.tr>

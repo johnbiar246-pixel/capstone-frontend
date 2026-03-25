@@ -15,7 +15,7 @@ import {
 } from "react-icons/md";
 
 import { getProducts, getCategories } from "../../api/products.js";
-import { createSale } from "../../api/sales.js";
+import { createOrder } from "../../api/orders.js";
 import { getAllTables } from "../../api/tables.js";
 
 const categories = [
@@ -161,14 +161,18 @@ const Cashier = () => {
         quantity: item.quantity,
         price: item.price,
       }));
-      await createSale(
+
+      // Create order directly in PREPARING status (bypassing PENDING)
+      await createOrder(
         items,
-        paymentMethod,
         selectedTableId,
+        "PREPARING", // Direct to preparing status
+        paymentMethod,
         paymentMethod === "GCASH" ? referenceNo.trim() : null,
       );
+
       alert(
-        `Sale completed! Total: ₱${getTotal().toFixed(2)} (${paymentMethod}${paymentMethod === "GCASH" ? ` - Ref: ${referenceNo}` : ""}) for Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
+        `Order created and sent to kitchen! Total: ₱${getTotal().toFixed(2)} (${paymentMethod}${paymentMethod === "GCASH" ? ` - Ref: ${referenceNo}` : ""}) for Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
       );
       setCart([]);
       setSelectedTableId("");
@@ -176,7 +180,7 @@ const Cashier = () => {
       setShowPayment(false);
       loadData(); // Refresh stock
     } catch (error) {
-      alert("Payment failed: " + error.message);
+      alert("Order creation failed: " + error.message);
     }
   };
 
