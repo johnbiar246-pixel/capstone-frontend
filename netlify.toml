@@ -23,6 +23,14 @@
   [headers.values]
     Content-Type = "application/javascript"
 
+# Redirect API requests to backend (for local dev or if VITE_API_URL is not set)
+[[redirects]]
+  from = "/api/*"
+  to = "https://capstone-backend-1cgj.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback - must be last
 [[redirects]]
   from = "/*"
   to = "/index.html"

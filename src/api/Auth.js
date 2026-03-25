@@ -1,10 +1,35 @@
 import axios from "axios";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+
+// Create axios instance with auth interceptor
+const authApi = axios.create({
+  baseURL: API_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Add request interceptor to include auth token
+authApi.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  },
+);
+
 export const loginUser = (email, password) =>
-  axios.post("/api/auth/signin", { email, password });
+  authApi.post("/auth/signin", { email, password });
 
 export const logoutUser = async () => {
   try {
-    await axios.post("/api/auth/logout", {}, { withCredentials: true });
+    await authApi.post("/auth/logout", {}, { withCredentials: true });
   } catch (error) {
     console.log("Logout API call failed, proceeding with client logout");
   } finally {
@@ -15,13 +40,13 @@ export const logoutUser = async () => {
 };
 
 export const createUser = (data) =>
-  axios.post("/api/auth/create-user", data, { withCredentials: true });
+  authApi.post("/auth/create-user", data, { withCredentials: true });
 
 export const getUsers = () =>
-  axios.get("/api/auth/users", { withCredentials: true });
+  authApi.get("/auth/users", { withCredentials: true });
 
 export const updateUser = (id, data) =>
-  axios.put(`/api/auth/users/${id}`, data, { withCredentials: true });
+  authApi.put(`/auth/users/${id}`, data, { withCredentials: true });
 
 export const deleteUser = (id) =>
-  axios.delete(`/api/auth/users/${id}`, { withCredentials: true });
+  authApi.delete(`/auth/users/${id}`, { withCredentials: true });
