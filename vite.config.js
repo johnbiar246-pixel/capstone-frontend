@@ -15,13 +15,30 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       },
-      headers: {
-        "Content-Type": "application/javascript",
+    },
+    build: {
+      // Ensure proper output format for module scripts
+      target: "esnext",
+      // Generate proper module files
+      rollupOptions: {
+        output: {
+          entryFileNames: "assets/[name]-[hash].js",
+          chunkFileNames: "assets/[name]-[hash].js",
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name.split(".");
+            const ext = info[info.length - 1];
+            if (/\.(js|mjs)$/i.test(assetInfo.name)) {
+              return "assets/[name]-[hash][extname]";
+            }
+            return "assets/[name]-[hash][extname]";
+          },
+        },
       },
     },
+    // Remove problematic esbuild config - let Vite handle JSX automatically
     esbuild: {
-      loader: "tsx",
       include: [/\.jsx?$/],
+      exclude: [],
     },
   };
 });
