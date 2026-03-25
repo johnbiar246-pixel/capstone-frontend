@@ -2,6 +2,7 @@
   command = "npm run build"
   publish = "dist"
 
+# Only set JavaScript MIME types - don't affect CSS or other assets
 [[headers]]
   for = "/*.js"
   [headers.values]
@@ -13,7 +14,12 @@
     Content-Type = "application/javascript"
 
 [[headers]]
-  for = "/assets/*"
+  for = "/assets/*.js"
+  [headers.values]
+    Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/assets/*.mjs"
   [headers.values]
     Content-Type = "application/javascript"
 

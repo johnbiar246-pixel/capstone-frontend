@@ -27,13 +27,21 @@ export default defineConfig(({ mode }) => {
           assetFileNames: (assetInfo) => {
             const info = assetInfo.name.split(".");
             const ext = info[info.length - 1];
+            // Keep CSS files separate with proper extensions
+            if (/\.css$/i.test(assetInfo.name)) {
+              return "assets/[name]-[hash][extname]";
+            }
+            // JavaScript files
             if (/\.(js|mjs)$/i.test(assetInfo.name)) {
               return "assets/[name]-[hash][extname]";
             }
+            // Other assets (images, fonts, etc.)
             return "assets/[name]-[hash][extname]";
           },
         },
       },
+      // Ensure CSS is properly extracted
+      cssCodeSplit: true,
     },
     // Remove problematic esbuild config - let Vite handle JSX automatically
     esbuild: {
