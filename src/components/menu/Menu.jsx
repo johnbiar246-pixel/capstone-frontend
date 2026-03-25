@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import Navbar from "../navbar/Navbar";
 import Footer from "../footer/Footer";
@@ -14,6 +14,8 @@ import {
   MdSearch,
   MdTableBar,
   MdShoppingCart,
+  MdQrCodeScanner,
+  MdInfo,
 } from "react-icons/md";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
@@ -59,6 +61,7 @@ const categories = [
 
 const Menu = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const tableNumber = searchParams.get("table");
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -66,6 +69,13 @@ const Menu = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const { addToCart, openCart } = useCart();
+
+  // Check if table is scanned - if not, show message but still allow browsing
+  const hasTableScanned = !!tableNumber;
+
+  const handleScanTable = () => {
+    navigate("/scan-table");
+  };
 
   // Fetch products from API
   useEffect(() => {
@@ -204,6 +214,32 @@ const Menu = () => {
         </div>
       </motion.section>
 
+      {/* Table Scan Notification */}
+      {!hasTableScanned && (
+        <motion.div
+          className="bg-amber-50 border-b border-amber-200 px-4 py-3"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="max-w-6xl mx-auto flex items-center justify-center gap-3">
+            <MdInfo className="text-amber-600 text-xl flex-shrink-0" />
+            <p className="text-amber-800 text-sm md:text-base">
+              Please scan a table QR code to place an order
+            </p>
+            <motion.button
+              onClick={handleScanTable}
+              className="flex items-center gap-1 bg-[#254F22] text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-[#1f3f1c] transition"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <MdQrCodeScanner className="text-sm" />
+              Scan Table
+            </motion.button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Category Tabs */}
       <section className="bg-white shadow-md sticky top-0 z-10 border-y border-[#254F22]/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
@@ -332,7 +368,7 @@ const Menu = () => {
                       boxShadow:
                         "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
                     }}
-                    onClick={() => handleAddToCart(product)}
+                    onClick={() => hasTableScanned && handleAddToCart(product)}
                   >
                     {/* Image Placeholder */}
                     <div
@@ -376,13 +412,28 @@ const Menu = () => {
                         <span className="text-xl font-bold text-[#254F22]">
                           ₱{product.price.toFixed(2)}
                         </span>
-                        <motion.button
-                          className="bg-[#254F22] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#3C3D37] transition shadow-md flex items-center gap-1"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <MdShoppingCart /> Add
-                        </motion.button>
+                        {hasTableScanned ? (
+                          <motion.button
+                            className="bg-[#254F22] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#3C3D37] transition shadow-md flex items-center gap-1"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <MdShoppingCart /> Add
+                          </motion.button>
+                        ) : (
+                          <motion.button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleScanTable();
+                            }}
+                            className="bg-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-400 transition shadow-md flex items-center gap-1 cursor-pointer"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            title="Scan table to order"
+                          >
+                            <MdQrCodeScanner /> Scan to Order
+                          </motion.button>
+                        )}
                       </div>
                     </div>
                   </motion.div>

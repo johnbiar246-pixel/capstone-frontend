@@ -37,8 +37,8 @@ const ScanTable = () => {
       const response = await getTableByNumber(number);
 
       if (response.success && response.data) {
-        // Valid table - navigate to user orders with table number
-        navigate(`/user/orders?table=${number}`);
+        // Valid table - navigate to menu with table number to place order
+        navigate(`/menu?table=${number}`);
       } else {
         setError(`Table ${number} not found. Please check and try again.`);
         setLoading(false);
