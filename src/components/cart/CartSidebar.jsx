@@ -72,11 +72,7 @@ const CartSidebar = () => {
         setShowPaymentModal(false);
         clearCart();
         closeCart();
-
-        // Redirect to orders page to see the order status
-        setTimeout(() => {
-          navigate("/user/orders");
-        }, 1500);
+        // Stay on menu page - no redirect needed for guest users
       } else {
         showNotification(
           response.message || "Failed to place order. Please try again.",

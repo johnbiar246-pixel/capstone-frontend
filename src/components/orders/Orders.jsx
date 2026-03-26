@@ -17,6 +17,79 @@ import { getTableByNumber } from "../../api/tables";
 import { getUserOrders, updateOrderStatus } from "../../api/orders";
 import PaymentMethodModal from "../modal/PaymentMethodModal";
 
+// Notification component
+const Notification = ({ notification, onClose }) => {
+  if (!notification) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -50, x: "-50%" }}
+      animate={{ opacity: 1, y: 0, x: "-50%" }}
+      exit={{ opacity: 0, y: -50, x: "-50%" }}
+      className={`fixed top-6 left-1/2 z-[60] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${
+        notification.type === "success"
+          ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+          : notification.type === "error"
+            ? "bg-gradient-to-r from-red-500 to-red-600 text-white"
+            : "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+      }`}
+    >
+      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+        {notification.type === "success" ? (
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        ) : notification.type === "error" ? (
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        ) : (
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        )}
+      </div>
+      <p className="font-medium">{notification.message}</p>
+      <button
+        onClick={onClose}
+        className="ml-2 p-1 hover:bg-white/20 rounded-full transition-colors"
+      >
+        <MdClose className="w-5 h-5" />
+      </button>
+    </motion.div>
+  );
+};
+
 const Orders = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -32,12 +105,21 @@ const Orders = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
+  // Notification state
+  const [notification, setNotification] = useState(null);
+
   // Dropdown states for order categories
   const [expandedSections, setExpandedSections] = useState({
     upcoming: true, // pending orders
     preparing: true, // preparing orders
     completed: false, // completed orders
   });
+
+  // Show notification helper
+  const showNotification = (message, type = "info") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   // Fetch table data when tableNumber is present in URL
   useEffect(() => {
@@ -130,7 +212,7 @@ const Orders = () => {
     // Check if user is authenticated
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to accept orders.");
+      showNotification("Please log in to accept orders.", "error");
       navigate("/login");
       return;
     }
@@ -152,8 +234,9 @@ const Orders = () => {
         );
         setShowPaymentModal(false);
         setSelectedOrder(null);
+        showNotification("Order accepted and moved to preparing!", "success");
       } else {
-        alert(response.message || "Failed to accept order");
+        showNotification(response.message || "Failed to accept order", "error");
       }
     } catch (err) {
       console.error("Error accepting order:", err);
@@ -167,7 +250,7 @@ const Orders = () => {
         setTimeout(() => navigate("/login"), 2000);
       }
 
-      alert(errorMessage);
+      showNotification(errorMessage, "error");
     }
   };
 
@@ -175,7 +258,7 @@ const Orders = () => {
     // Check if user is authenticated
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to complete orders.");
+      showNotification("Please log in to complete orders.", "error");
       navigate("/login");
       return;
     }
@@ -195,8 +278,12 @@ const Orders = () => {
             order.id === orderId ? { ...order, status: "completed" } : order,
           ),
         );
+        showNotification("Order marked as completed successfully!", "success");
       } else {
-        alert(response.message || "Failed to complete order");
+        showNotification(
+          response.message || "Failed to complete order",
+          "error",
+        );
       }
     } catch (err) {
       console.error("Error completing order:", err);
@@ -210,7 +297,7 @@ const Orders = () => {
         setTimeout(() => navigate("/login"), 2000);
       }
 
-      alert(errorMessage);
+      showNotification(errorMessage, "error");
     }
   };
 
@@ -218,7 +305,7 @@ const Orders = () => {
     // Check if user is authenticated
     const token = localStorage.getItem("token");
     if (!token) {
-      alert("Please log in to cancel orders.");
+      showNotification("Please log in to cancel orders.", "error");
       navigate("/login");
       return;
     }
@@ -227,8 +314,9 @@ const Orders = () => {
       const response = await updateOrderStatus(orderId, "CANCELLED");
       if (response.success) {
         setOrders(orders.filter((order) => order.id !== orderId));
+        showNotification("Order cancelled successfully!", "success");
       } else {
-        alert(response.message || "Failed to cancel order");
+        showNotification(response.message || "Failed to cancel order", "error");
       }
     } catch (err) {
       console.error("Error cancelling order:", err);
@@ -242,7 +330,7 @@ const Orders = () => {
         setTimeout(() => navigate("/login"), 2000);
       }
 
-      alert(errorMessage);
+      showNotification(errorMessage, "error");
     }
   };
 
@@ -473,6 +561,14 @@ const Orders = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
+      {/* Notification */}
+      <AnimatePresence>
+        <Notification
+          notification={notification}
+          onClose={() => setNotification(null)}
+        />
+      </AnimatePresence>
+
       <motion.h1
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
