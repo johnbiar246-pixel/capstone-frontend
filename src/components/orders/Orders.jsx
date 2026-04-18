@@ -15,6 +15,7 @@ import {
 import { FaGlassCheers } from "react-icons/fa";
 import { getTableByNumber } from "../../api/tables";
 import { getUserOrders, updateOrderStatus } from "../../api/orders";
+import TenderModal from "../modal/TenderModal";
 import PaymentMethodModal from "../modal/PaymentMethodModal";
 
 // Notification component
@@ -101,9 +102,11 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
-  // Payment modal state
+// Tender modal state
+  const [showTenderModal, setShowTenderModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
 
   // Notification state
   const [notification, setNotification] = useState(null);
@@ -155,6 +158,7 @@ const Orders = () => {
             minute: "2-digit",
           }),
           tableId: order.tableId,
+          tableNumber: order.table?.number || "N/A",
           paymentMethod: order.paymentMethod,
           referenceNo: order.referenceNo,
         }));
@@ -197,8 +201,8 @@ const Orders = () => {
   const handleAcceptClick = (orderId) => {
     const order = orders.find((o) => o.id === orderId);
     if (order.status === "pending") {
-      // Open payment modal for pending orders
-      setSelectedOrder(order);
+      // Open payment method modal for pending orders
+      setSelectedOrderForPayment(order);
       setShowPaymentModal(true);
     } else if (order.status === "preparing") {
       // Directly complete preparing orders (payment method already stored)
@@ -206,7 +210,56 @@ const Orders = () => {
     }
   };
 
-  const handlePaymentConfirm = async (paymentMethod, referenceNo) => {
+  const handleAcceptPayment = async (paymentMethod, referenceNo, amountTendered) => {
+    if (!selectedOrderForPayment) return;
+
+    // Check if user is authenticated
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showNotification("Please log in to accept orders.", "error");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await updateOrderStatus(
+        selectedOrderForPayment.id,
+        "PREPARING",
+        paymentMethod,
+        referenceNo,
+        amountTendered
+      );
+      if (response.success) {
+        setOrders(
+          orders.map((order) =>
+            order.id === selectedOrderForPayment.id
+              ? { ...order, status: "preparing", paymentMethod, referenceNo, amountTendered }
+              : order,
+          ),
+        );
+        setShowPaymentModal(false);
+        setSelectedOrderForPayment(null);
+        showNotification("Order accepted and moved to preparing!", "success");
+      } else {
+        showNotification(response.message || "Failed to accept order", "error");
+      }
+    } catch (err) {
+      console.error("Error accepting order:", err);
+
+      // Use error message from axios interceptor if available
+      let errorMessage =
+        err.message || "Failed to accept order. Please try again.";
+
+      // Handle specific auth errors
+      if (err.response?.status === 401) {
+        setTimeout(() => navigate("/login"), 2000);
+      }
+
+      showNotification(errorMessage, "error");
+    }
+  };
+
+  const handleTenderConfirm = async (paymentMethod, referenceNo, amountTendered) => {
     if (!selectedOrder) return;
 
     // Check if user is authenticated
@@ -223,16 +276,17 @@ const Orders = () => {
         "PREPARING",
         paymentMethod,
         referenceNo,
+        amountTendered
       );
       if (response.success) {
         setOrders(
           orders.map((order) =>
             order.id === selectedOrder.id
-              ? { ...order, status: "preparing", paymentMethod, referenceNo }
+              ? { ...order, status: "preparing", paymentMethod, referenceNo, amountTendered }
               : order,
           ),
         );
-        setShowPaymentModal(false);
+        setShowTenderModal(false);
         setSelectedOrder(null);
         showNotification("Order accepted and moved to preparing!", "success");
       } else {
@@ -416,6 +470,13 @@ const Orders = () => {
               Order #{order.orderNumber || order.id.slice(-4)}
             </p>
             <p className="text-xs sm:text-sm text-gray-500">{order.time}</p>
+            {/* Table Number Badge for easy navigation */}
+            <div className="flex items-center gap-1 mt-1">
+              <MdTableBar className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-semibold text-green-900 bg-green-100 hover:bg-green-200 px-2 sm:px-3 py-1 rounded-full transition-colors cursor-default">
+                Table #{order.tableNumber}
+              </span>
+            </div>
           </div>
         </div>
         <span
@@ -690,17 +751,29 @@ const Orders = () => {
         )}
       </motion.div>
 
-      {/* Payment Method Modal */}
+      {/* Tender Modal for CASH payments */}
+      <TenderModal
+        isOpen={showTenderModal}
+        onClose={() => {
+          setShowTenderModal(false);
+          setSelectedOrder(null);
+        }}
+        onConfirm={handleTenderConfirm}
+        totalAmount={selectedOrder?.total || 0}
+        orderId={selectedOrder?.orderNumber || selectedOrder?.id}
+      />
+
+      {/* Payment Method Modal for accepting orders */}
       <PaymentMethodModal
         isOpen={showPaymentModal}
         onClose={() => {
           setShowPaymentModal(false);
-          setSelectedOrder(null);
+          setSelectedOrderForPayment(null);
         }}
-        onConfirm={handlePaymentConfirm}
-        totalAmount={selectedOrder?.total || 0}
+        onConfirm={handleAcceptPayment}
+        totalAmount={selectedOrderForPayment?.total || 0}
         mode="staff"
-        orderId={selectedOrder?.id}
+        orderId={selectedOrderForPayment?.orderNumber || selectedOrderForPayment?.id}
       />
     </motion.div>
   );

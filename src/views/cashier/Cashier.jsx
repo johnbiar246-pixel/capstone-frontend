@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   MdRestaurantMenu,
   MdLocalBar,
@@ -12,6 +12,7 @@ import {
   MdTableBar,
   MdAttachMoney,
   MdPhoneAndroid,
+  MdClose,
 } from "react-icons/md";
 
 import { getProducts, getCategories } from "../../api/products.js";
@@ -68,9 +69,12 @@ const Cashier = () => {
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [showPayment, setShowPayment] = useState(false);
   const [referenceNo, setReferenceNo] = useState("");
+  const [tenderedAmount, setTenderedAmount] = useState(0);
+  const [changeAmount, setChangeAmount] = useState(0);
   const [tables, setTables] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState("");
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
+  const [notification, setNotification] = useState(null);
 
   // Load data
   useEffect(() => {
@@ -113,6 +117,15 @@ const Cashier = () => {
     setFilteredProducts(filtered);
   }, [activeCategory, searchQuery, products]);
 
+  // Auto-calculate change for CASH
+  useEffect(() => {
+    if (showPayment && paymentMethod === "CASH") {
+      const total = getTotal();
+      const change = tenderedAmount - total;
+      setChangeAmount(change);
+    }
+  }, [tenderedAmount, cart, showPayment, paymentMethod]);
+
   const addToCart = (product) => {
     const existing = cart.find((item) => item.id === product.id);
     if (existing) {
@@ -149,10 +162,24 @@ const Cashier = () => {
   const getTotal = () =>
     cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  const showNotification = (message, type = "info") => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000);
+  };
+
   const handlePayment = async () => {
     if (cart.length === 0) return;
+
+    if (paymentMethod === "CASH") {
+      const total = getTotal();
+      if (tenderedAmount < total) {
+        showNotification(`Amount tendered (₱${tenderedAmount.toFixed(2)}) must be >= total (₱${total.toFixed(2)})`, "error");
+        return;
+      }
+    }
+
     if (paymentMethod === "GCASH" && !referenceNo.trim()) {
-      alert("Reference number is required for GCASH payment.");
+      showNotification("Reference number is required for GCASH payment.", "error");
       return;
     }
     try {
@@ -171,16 +198,19 @@ const Cashier = () => {
         paymentMethod === "GCASH" ? referenceNo.trim() : null,
       );
 
-      alert(
-        `Order created and sent to kitchen! Total: ₱${getTotal().toFixed(2)} (${paymentMethod}${paymentMethod === "GCASH" ? ` - Ref: ${referenceNo}` : ""}) for Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
+      showNotification(
+        `Payment completed! Order sent to kitchen. Total: ₱${getTotal().toFixed(2)} (${paymentMethod}${paymentMethod === "GCASH" ? ` - Ref: ${referenceNo}` : ""}) Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
+        "success"
       );
       setCart([]);
       setSelectedTableId("");
       setReferenceNo("");
+      setTenderedAmount(getTotal());
+      setChangeAmount(0);
       setShowPayment(false);
       loadData(); // Refresh stock
     } catch (error) {
-      alert("Order creation failed: " + error.message);
+      showNotification("Order creation failed: " + error.message, "error");
     }
   };
 
@@ -272,11 +302,14 @@ const Cashier = () => {
                       </span>
                       <MdAdd className="text-2xl text-emerald-500 group-hover:scale-110 transition" />
                     </div>
-                    {product.stock < 5 && (
-                      <div className="mt-2 p-1 bg-yellow-100 text-yellow-800 text-xs rounded">
-                        Low stock: {product.stock}
-                      </div>
-                    )}
+                    {(() => {
+                      const productCategoryId = product.category?.name?.toLowerCase().replace(/\s+/g, "-");
+                      return product.stock < 5 && !['main-dishes', 'appetizers'].includes(productCategoryId) && (
+                        <div className="mt-2 p-1 bg-yellow-100 text-yellow-800 text-xs rounded">
+                          Low stock: {product.stock}
+                        </div>
+                      );
+                    })()}
                   </motion.div>
                 ))}
               </div>
@@ -367,7 +400,7 @@ const Cashier = () => {
                 <motion.button
                   onClick={() => {
                     if (!selectedTableId) {
-                      alert("Please select a table first");
+                      showNotification("Please select a table first", "error");
                       return;
                     }
                     setShowPayment(true);
@@ -388,6 +421,47 @@ const Cashier = () => {
           )}
         </motion.div>
       </div>
+
+      {/* Notification */}
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className={`fixed top-6 left-1/2 z-[60] px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 ${
+              notification.type === "success"
+                ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                : notification.type === "error"
+                  ? "bg-gradient-to-r from-red-500 to-red-600 text-white"
+                  : "bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+            }`}
+          >
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+              {notification.type === "success" ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : notification.type === "error" ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              )}
+            </div>
+            <p className="font-medium flex-1">{notification.message}</p>
+            <button
+              onClick={() => setNotification(null)}
+              className="p-1 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <MdClose className="w-5 h-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Payment Modal */}
       {showPayment && (
@@ -419,6 +493,7 @@ const Cashier = () => {
                 <motion.button
                   onClick={() => {
                     setPaymentMethod("CASH");
+                    setTenderedAmount(getTotal());
                   }}
                   className={`flex-1 p-3 rounded-xl font-bold transition-all ${paymentMethod === "CASH" ? "bg-emerald-500 text-white shadow-lg" : "bg-gray-100 hover:bg-emerald-100"} flex items-center justify-center gap-2`}
                   whileHover={{ scale: 1.02 }}
@@ -427,11 +502,11 @@ const Cashier = () => {
                   <MdAttachMoney /> Cash
                 </motion.button>
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={() => {
                     setPaymentMethod("GCASH");
                   }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   className={`flex-1 p-3 rounded-xl font-bold transition-all ${paymentMethod === "GCASH" ? "bg-green-500 text-white shadow-lg" : "bg-gray-100 hover:bg-green-100"} flex items-center justify-center gap-2`}
                 >
                   <MdPhoneAndroid /> GCash
@@ -452,10 +527,43 @@ const Cashier = () => {
                   />
                 </div>
               )}
+              {paymentMethod === "CASH" && (
+                <div className="mt-4 space-y-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                     Amount Tendered
+                  </label>
+                  <input
+                    type="text"
+                    value={tenderedAmount}
+                    onChange={(e) => setTenderedAmount(e.target.value)}
+                    placeholder="Enter tendered amount"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-lg font-bold"
+                  />
+                  {changeAmount >= 0 ? (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                      <span className="text-sm font-medium text-emerald-800">Change:</span>
+                      <div className="text-2xl font-bold text-emerald-600 mt-1">
+                        ₱{changeAmount.toFixed(2)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+                      <span className="text-sm font-medium text-red-800">Insufficient Amount</span>
+                      <div className="text-lg font-bold text-red-600 mt-1">
+                        Need ₱{Math.abs(changeAmount).toFixed(2)} more
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3 pt-4">
               <motion.button
-                onClick={() => setShowPayment(false)}
+                onClick={() => {
+                  setTenderedAmount(getTotal());
+                  setChangeAmount(0);
+                  setShowPayment(false);
+                }}
                 className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-bold hover:bg-gray-300 transition"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

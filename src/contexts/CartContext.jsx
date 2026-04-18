@@ -79,6 +79,7 @@ export const CartProvider = ({ children }) => {
     tableId,
     paymentMethod = null,
     referenceNo = null,
+    amountTendered = null,
   ) => {
     if (cart.length === 0) {
       throw new Error("Cart is empty");
@@ -93,7 +94,7 @@ export const CartProvider = ({ children }) => {
 
     // Call API to create order (not sale yet - will become sale when completed)
     // Note: For customer orders, paymentMethod and referenceNo are stored but not required
-    const response = await createOrder(items, tableId);
+    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo);
 
     // Clear cart after successful order
     if (response.success) {

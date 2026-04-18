@@ -560,7 +560,7 @@ const History = () => {
 
         {todaySales.length > 0 ? (
           <div className="space-y-4 sm:space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="bg-green-50 p-4 sm:p-6 rounded-xl border border-green-100">
                 <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
                   Total Sales
@@ -578,20 +578,6 @@ const History = () => {
                 </h3>
                 <p className="text-2xl sm:text-3xl font-bold text-blue-600">
                   {todaySales.length}
-                </p>
-              </div>
-              <div className="bg-purple-50 p-4 sm:p-6 rounded-xl border border-purple-100">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">
-                  Average Transaction
-                </h3>
-                <p className="text-2xl sm:text-3xl font-bold text-purple-600">
-                  ₱
-                  {(
-                    todaySales.reduce(
-                      (sum, sale) => sum + sale.totalAmount,
-                      0,
-                    ) / todaySales.length
-                  ).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -942,9 +928,6 @@ const History = () => {
                 <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
                   Revenue
                 </th>
-                <th className="text-right py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-sm sm:text-base">
-                  Avg. Order
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -964,9 +947,6 @@ const History = () => {
                   </td>
                   <td className="py-3 sm:py-4 px-2 sm:px-4 text-right font-semibold text-green-600 text-xs sm:text-sm whitespace-nowrap">
                     ₱{month.sales.toLocaleString()}
-                  </td>
-                  <td className="py-3 sm:py-4 px-2 sm:px-4 text-right text-gray-600 text-xs sm:text-sm whitespace-nowrap">
-                    ₱{(month.sales / month.orders).toFixed(2)}
                   </td>
                 </motion.tr>
               ))}

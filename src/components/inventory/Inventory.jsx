@@ -27,12 +27,39 @@ const Inventory = () => {
   const [sortDir, setSortDir] = useState("asc");
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredInventory, setFilteredInventory] = useState([]);
+  const [showStock, setShowStock] = useState(true);
+
+  const NO_STOCK_CATEGORIES = ['Main Dishes', 'Appetizers'];
 
   // Check admin role
   useEffect(() => {
     const role = localStorage.getItem("userRole");
     setIsAdmin(role === "ADMIN");
   }, []);
+
+  // Update showStock based on category
+  useEffect(() => {
+    if (newProduct.categoryId) {
+      const selectedCat = categories.find(cat => cat.id === newProduct.categoryId);
+      setShowStock(!NO_STOCK_CATEGORIES.includes(selectedCat?.name || ''));
+    } else {
+      setShowStock(true);
+    }
+  }, [newProduct.categoryId, categories]);
+
+  // Clear stock input when no-stock category selected
+  useEffect(() => {
+    if (!showStock) {
+      setNewProduct(prev => ({ ...prev, stock: '' }));
+    }
+  }, [showStock]);
+
+  useEffect(() => {
+    if (editingProduct?.categoryId) {
+      const selectedCat = categories.find(cat => cat.id === editingProduct.categoryId);
+      setShowStock(!NO_STOCK_CATEGORIES.includes(selectedCat?.name || ''));
+    }
+  }, [editingProduct?.categoryId, categories]);
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
@@ -172,7 +199,7 @@ const Inventory = () => {
         name: newProduct.name,
         description: newProduct.description || null,
         price: parseFloat(newProduct.price),
-        stock: parseInt(newProduct.stock),
+        stock: showStock ? parseInt(newProduct.stock || 0) : 0,
         categoryId: newProduct.categoryId,
       };
 
@@ -207,7 +234,7 @@ const Inventory = () => {
         name: editingProduct.name,
         description: editingProduct.description || null,
         price: parseFloat(editingProduct.price),
-        stock: parseInt(editingProduct.stock),
+        stock: showStock ? parseInt(editingProduct.stock || 0) : 0,
         categoryId: editingProduct.categoryId,
       };
 
@@ -411,21 +438,23 @@ const Inventory = () => {
                       <span className="text-xl font-bold text-emerald-600 group-hover:text-emerald-700">
                         ₱{item.price?.toFixed(2)}
                       </span>
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-xl font-bold text-gray-900">
-                          {item.stock}
-                        </span>
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">
-                          in stock
-                        </span>
-                        {status.icon && (
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${status.color}`}
-                          >
-                            {status.label}
+                      {NO_STOCK_CATEGORIES.includes(item.category?.name) ? null : (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-xl font-bold text-gray-900">
+                            {item.stock}
                           </span>
-                        )}
-                      </div>
+                          <span className="text-xs text-gray-500 uppercase tracking-wide">
+                            in stock
+                          </span>
+                          {status.icon && (
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${status.color}`}
+                            >
+                              {status.label}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {isAdmin && (
                       <div className="flex gap-2 absolute top-3 right-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -536,20 +565,22 @@ const Inventory = () => {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Stock *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      name="stock"
-                      value={newProduct.stock}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                      required
-                    />
-                  </div>
+                  {showStock && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Stock *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        name="stock"
+                        value={newProduct.stock}
+                        onChange={handleInputChange}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -701,20 +732,22 @@ const Inventory = () => {
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Stock *
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      name="stock"
-                      value={editingProduct.stock}
-                      onChange={handleEditInputChange}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                      required
-                    />
-                  </div>
+                  {showStock && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Stock *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        name="stock"
+                        value={editingProduct.stock}
+                        onChange={handleEditInputChange}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        required
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>

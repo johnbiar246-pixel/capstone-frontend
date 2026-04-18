@@ -7,6 +7,7 @@ export const createOrder = async (
   status = "PENDING",
   paymentMethod = null,
   referenceNo = null,
+  amountTendered = null,
 ) => {
   try {
     // Get userId if available (for logged in users), otherwise use guest mode
@@ -20,17 +21,12 @@ export const createOrder = async (
       items,
       tableId,
       status,
+      ...(paymentMethod && { paymentMethod }),
+      ...(referenceNo && { referenceNo }),
+      ...(amountTendered && { amountTendered }),
     };
 
-    // Add payment info if creating as PREPARING (POS flow)
-    if (status === "PREPARING" && paymentMethod) {
-      requestData.paymentMethod = paymentMethod;
-      if (referenceNo) {
-        requestData.referenceNo = referenceNo;
-      }
-    }
-
-    const response = await API.post(`/orders`, requestData);
+    const response = await API.post("/orders", requestData);
     return response.data;
   } catch (error) {
     throw error;

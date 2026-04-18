@@ -1,11 +1,16 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdRestaurantMenu, MdClose } from "react-icons/md";
+import { MdRestaurantMenu, MdClose, MdTableBar, MdAccessTime, MdCheck } from "react-icons/md";
 import { FaGlassCheers } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { getOrdersByTable } from "../../api/orders";
 
 const MenuModal = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [tableNumber, setTableNumber] = useState(searchParams.get("table") || localStorage.getItem("tableNumber"));
+  const [statusOrders, setStatusOrders] = useState({ preparing: 0, completed: 0 });
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const handleViewMenu = () => {
     navigate("/menu");
@@ -17,6 +22,41 @@ const MenuModal = ({ isOpen, onClose }) => {
     navigate("/scan-table");
     onClose();
   };
+
+  const handleOrderStatus = async () => {
+    if (!tableNumber) {
+      navigate("/scan-table");
+      onClose();
+      return;
+    }
+
+    // Quick status check
+    setStatusLoading(true);
+    try {
+      const response = await getOrdersByTable(tableNumber);
+      if (response.success) {
+        const preparingCount = response.data.filter(o => o.status?.toLowerCase() === 'preparing').length;
+        const completedCount = response.data.filter(o => o.status?.toLowerCase() === 'completed').length;
+        setStatusOrders({ preparing: preparingCount, completed: completedCount });
+        
+        // If orders exist, navigate to full orders page
+        if (preparingCount > 0 || completedCount > 0) {
+          navigate(`/orders?table=${tableNumber}`);
+        }
+      }
+    } catch (err) {
+      console.error("Status check failed:", err);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const storedTable = searchParams.get("table") || localStorage.getItem("tableNumber");
+    if (storedTable) {
+      setTableNumber(storedTable);
+    }
+  }, [searchParams]);
 
   return (
     <AnimatePresence>
@@ -71,6 +111,29 @@ const MenuModal = ({ isOpen, onClose }) => {
                 >
                   <FaGlassCheers className="text-xl" />
                   Order Now
+                </motion.button>
+
+                {/* Order Status Button */}
+                <motion.button
+                  onClick={handleOrderStatus}
+                  className="w-full flex items-center justify-center gap-3 bg-[#3C3D37]/90 text-white px-6 py-4 rounded-xl font-semibold hover:bg-[#3C3D37] transition shadow-md relative"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={statusLoading}
+                >
+                  {statusLoading ? (
+                    <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <MdTableBar className="text-xl" />
+                      Order Status
+                      {tableNumber && statusOrders.preparing > 0 && (
+                        <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                          {statusOrders.preparing}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </motion.button>
 
                 {/* View Menu Button */}

@@ -102,17 +102,6 @@ const Login = () => {
                 This system is intended for authorized staff only.
               </p>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/15 border border-white/20 text-sm">
-                <MdAdminPanelSettings className="w-4 h-4" />
-                Admin
-              </span>
-              <span className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/15 border border-white/20 text-sm">
-                <MdPointOfSale className="w-4 h-4" />
-                Cashier
-              </span>
-            </div>
           </div>
 
           {/* Right panel / form */}
@@ -137,17 +126,6 @@ const Login = () => {
                 <span className="font-semibold text-[#3C3D37]">Cashier</span>{" "}
                 accounts.
               </p>
-
-              <div className="flex flex-wrap gap-2 md:hidden">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#e7efe3] text-[#254F22] text-xs font-semibold">
-                  <MdAdminPanelSettings className="w-4 h-4" />
-                  Admin
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#ecefe9] text-[#3C3D37] text-xs font-semibold">
-                  <MdPointOfSale className="w-4 h-4" />
-                  Cashier
-                </span>
-              </div>
             </div>
 
             {/* Error */}

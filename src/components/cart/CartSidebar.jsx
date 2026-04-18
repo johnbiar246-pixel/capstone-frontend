@@ -50,7 +50,7 @@ const CartSidebar = () => {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const handlePaymentConfirm = async (paymentMethod, referenceNo) => {
+  const handlePaymentConfirm = async (paymentMethod, referenceNo, amountTendered) => {
     try {
       // Fetch table data to get the UUID
       const tableResponse = await getTableByNumber(tableNumber);
@@ -219,7 +219,12 @@ const CartSidebar = () => {
 
                       {/* Remove Button */}
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => {
+                          if (window.confirm(`Remove ${item.name} from cart?`)) {
+                            removeFromCart(item.id);
+                            showNotification(`${item.name} removed from cart.`, "success");
+                          }
+                        }}
                         className="text-red-400 hover:text-red-600 transition p-2 hover:bg-red-50 rounded-full self-start"
                       >
                         <MdDelete className="text-xl" />

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdClose, MdLocalDining, MdInfo, MdPayment } from "react-icons/md";
+import { MdClose, MdLocalDining, MdInfo, MdPayment, MdAttachMoney } from "react-icons/md";
 import { FaMoneyBillWave, FaMobileAlt } from "react-icons/fa";
 
 const PaymentMethodModal = ({
@@ -14,6 +14,7 @@ const PaymentMethodModal = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("CASH");
   const [referenceNo, setReferenceNo] = useState("");
+  const [amountTendered, setAmountTendered] = useState("");
 
   const handleConfirm = async () => {
     // Validate GCASH reference number (only required for staff mode)
@@ -22,12 +23,23 @@ const PaymentMethodModal = ({
       return;
     }
 
+    // Validate CASH amount tendered
+    if (paymentMethod === "CASH") {
+      const tendered = parseFloat(amountTendered) || 0;
+      if (tendered < totalAmount) {
+        alert(`Amount tendered (₱${tendered.toFixed(2)}) must be >= total (₱${totalAmount.toFixed(2)})`);
+        return;
+      }
+    }
+
     setIsProcessing(true);
     try {
       // Pass referenceNo only for staff mode, null for customer mode
+      // Pass amountTendered for CASH
       await onConfirm(
         paymentMethod,
         mode === "staff" ? referenceNo.trim() : null,
+        paymentMethod === "CASH" ? parseFloat(amountTendered) : null
       );
     } catch (error) {
       console.error("Order failed:", error);
@@ -45,6 +57,7 @@ const PaymentMethodModal = ({
   const resetState = () => {
     setPaymentMethod("CASH");
     setReferenceNo("");
+    setAmountTendered("");
   };
 
   // Reset state when modal closes
@@ -203,6 +216,56 @@ const PaymentMethodModal = ({
                         <p className="text-xs text-gray-500">
                           Required for GCash payments
                         </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* CASH Amount Tendered Input */}
+                  <AnimatePresence>
+                    {paymentMethod === "CASH" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="space-y-3"
+                      >
+                        <label className="text-sm text-gray-600 font-medium flex items-center gap-2">
+                          <MdAttachMoney className="text-emerald-500" />
+                          Amount Tendered *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={totalAmount}
+                          value={amountTendered}
+                          onChange={(e) => setAmountTendered(e.target.value)}
+                          placeholder={`0.00 (min: ₱${totalAmount.toFixed(2)})`}
+                          disabled={isProcessing}
+                          className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-emerald-500 focus:outline-none transition text-lg font-bold text-right"
+                        />
+                        {(() => {
+                          const tendered = parseFloat(amountTendered) || 0;
+                          const change = tendered - totalAmount;
+                          if (change >= 0) {
+                            return (
+                              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                                <span className="text-sm font-medium text-emerald-800">Change:</span>
+                                <div className="text-2xl font-bold text-emerald-600 mt-1">
+                                  ₱{change.toFixed(2)}
+                                </div>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
+                                <span className="text-sm font-medium text-red-800">Insufficient Amount</span>
+                                <div className="text-lg font-bold text-red-600 mt-1">
+                                  Need ₱{Math.abs(change).toFixed(2)} more
+                                </div>
+                              </div>
+                            );
+                          }
+                        })()}
                       </motion.div>
                     )}
                   </AnimatePresence>
