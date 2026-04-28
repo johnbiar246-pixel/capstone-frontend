@@ -15,8 +15,11 @@ import {
 import { FaGlassCheers } from "react-icons/fa";
 import { getTableByNumber } from "../../api/tables";
 import { getUserOrders, updateOrderStatus } from "../../api/orders";
+
 import UnifiedPaymentModal from "../modal/UnifiedPaymentModal";
 import TenderModal from "../modal/TenderModal";
+import ReceiptModal from "../modal/ReceiptModal";
+import CancelConfirmModal from "../modal/CancelConfirmModal";
 
 // Notification component
 const Notification = ({ notification, onClose }) => {
@@ -108,6 +111,16 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
   // Tender Modal states
   const [showTenderModal, setShowTenderModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
+
+  // Cancel confirmation modal state
+  const [showCancelConfirmModal, setShowCancelConfirmModal] = useState(false);
+  const [pendingCancelOrderId, setPendingCancelOrderId] = useState(null);
+  const [pendingCancelOrder, setPendingCancelOrder] = useState(null);
+
+  // Loading states
+  const [orderLoading, setOrderLoading] = useState({});
 
   // Notification state
   const [notification, setNotification] = useState(null);
@@ -135,6 +148,8 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
   // Fetch orders from API
   useEffect(() => {
     fetchOrders();
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchOrders = async () => {
@@ -149,6 +164,11 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
           details: order.orderItems
             .map((item) => `${item.quantity}x ${item.product?.name || "Item"}`)
             .join(", "),
+          totalAmount: order.totalAmount,
+          foodSubtotal: order.foodSubtotal || 0,
+          nonFoodSubtotal: order.nonFoodSubtotal || 0,
+          discount: order.discount || 0,
+          serviceCharge: order.serviceCharge || 0,
           total: order.orderItems.reduce(
             (sum, item) => sum + item.price * item.quantity,
             0,
@@ -237,7 +257,9 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
         );
         setShowUnifiedModal(false);
         setSelectedOrderForPayment(null);
-        showNotification("Order accepted and moved to preparing! Receipt generated.", "success");
+        setShowReceiptModal(true);
+        setSelectedReceiptOrderId(selectedOrderForPayment.id);
+        showNotification("Order accepted! Receipt ready.", "success");
       } else {
         showNotification(response.message || "Failed to accept order", "error");
       }
@@ -280,7 +302,9 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
         );
         setShowTenderModal(false);
         setSelectedOrder(null);
-        showNotification("Order accepted and moved to preparing!", "success");
+        setShowReceiptModal(true);
+        setSelectedReceiptOrderId(selectedOrder.id);
+        showNotification("Order accepted! Receipt ready.", "success");
       } else {
         showNotification(response.message || "Failed to accept order", "error");
       }
@@ -347,8 +371,18 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
     }
   };
 
-  const handleCancel = async (orderId) => {
-    // Check if user is authenticated
+const handleCancelClick = (orderId) => {
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    setPendingCancelOrderId(orderId);
+    setPendingCancelOrder(order);
+    setShowCancelConfirmModal(true);
+  };
+
+  const handleCancelConfirm = async () => {
+    if (!pendingCancelOrderId) return;
+
     const token = localStorage.getItem("token");
     if (!token) {
       showNotification("Please log in to cancel orders.", "error");
@@ -356,29 +390,39 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
       return;
     }
 
+    setOrderLoading((prev) => ({ ...prev, [pendingCancelOrderId]: true }));
+    setShowCancelConfirmModal(false);
+
     try {
-      const response = await updateOrderStatus(orderId, "CANCELLED");
+      const response = await updateOrderStatus(pendingCancelOrderId, "CANCELLED");
       if (response.success) {
-        setOrders(orders.filter((order) => order.id !== orderId));
+        setOrders(orders.filter((order) => order.id !== pendingCancelOrderId));
         showNotification("Order cancelled successfully!", "success");
       } else {
         showNotification(response.message || "Failed to cancel order", "error");
       }
     } catch (err) {
       console.error("Error cancelling order:", err);
-
-      // Use error message from axios interceptor if available
-      let errorMessage =
-        err.message || "Failed to cancel order. Please try again.";
-
-      // Handle specific auth errors
+      let errorMessage = err.message || "Failed to cancel order. Please try again.";
       if (err.response?.status === 401) {
         setTimeout(() => navigate("/login"), 2000);
       }
-
       showNotification(errorMessage, "error");
+    } finally {
+      setOrderLoading((prev) => ({ ...prev, [pendingCancelOrderId]: false }));
+      setPendingCancelOrderId(null);
+      setPendingCancelOrder(null);
     }
   };
+
+  const handleCancelClose = () => {
+    setShowCancelConfirmModal(false);
+    setPendingCancelOrderId(null);
+    setPendingCancelOrder(null);
+  };
+
+  // Remove old handleCancel function if present (commented out in current file)
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -498,8 +542,26 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
         </div>
       )}
 
-      <p className="text-base sm:text-lg font-bold text-green-600 mb-2">
-        Total: ₱{order.total.toFixed(2)}
+      {order.foodSubtotal && order.serviceCharge && (
+        <div className="space-y-1 mb-2 text-xs text-gray-600">
+          <div className="flex justify-between">
+            <span>Food Subtotal:</span>
+            <span>₱{order.foodSubtotal.toFixed(2)}</span>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-green-600 font-semibold">
+              <span>Discount:</span>
+              <span>-₱{order.discount.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>Service:</span>
+            <span>₱{order.serviceCharge.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+      <p className="text-base sm:text-lg font-bold text-green-600">
+        Total: ₱{order.totalAmount || order.total?.toFixed(2)}
       </p>
 
       {/* Action Buttons - Smaller on mobile */}
@@ -520,12 +582,27 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => handleCancel(order.id)}
-                className="flex-1 px-2 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs sm:text-sm font-semibold rounded-lg hover:from-red-600 hover:to-red-700 transition-all flex items-center justify-center gap-1"
+                onClick={() => handleCancelClick(order.id)}
+                disabled={orderLoading[order.id]}
+                className={`flex-1 px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1 ${
+                  orderLoading[order.id]
+                    ? 'bg-red-400 cursor-not-allowed text-white/70'
+                    : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white'
+                }`}
               >
-                <MdClose className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Cancel</span>
-                <span className="sm:hidden">Cancel</span>
+                {orderLoading[order.id] ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Cancelling...</span>
+                    <span className="sm:hidden">...</span>
+                  </>
+                ) : (
+                  <>
+                    <MdClose className="w-3 h-3 sm:w-4 sm:h-4" />
+                    <span className="hidden sm:inline">Cancel</span>
+                    <span className="sm:hidden">Cancel</span>
+                  </>
+                )}
               </motion.button>
             </>
           ) : (
@@ -753,6 +830,24 @@ const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
         onConfirm={handleTenderConfirm}
         totalAmount={selectedOrder?.total || 0}
         orderId={selectedOrder?.orderNumber || selectedOrder?.id}
+      />
+
+      <ReceiptModal 
+        isOpen={showReceiptModal} 
+        onClose={() => {
+          setShowReceiptModal(false);
+          setSelectedReceiptOrderId(null);
+        }} 
+        orderId={selectedReceiptOrderId} 
+      />
+
+      {/* Cancel Confirmation Modal */}
+      <CancelConfirmModal
+        isOpen={showCancelConfirmModal}
+        onClose={handleCancelClose}
+        onConfirm={handleCancelConfirm}
+        orderNumber={pendingCancelOrder?.orderNumber || pendingCancelOrderId?.slice(-4)}
+        orderDetails={pendingCancelOrder?.details || 'Order details not available'}
       />
 
     </motion.div>

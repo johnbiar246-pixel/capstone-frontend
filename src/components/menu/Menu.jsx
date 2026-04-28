@@ -89,7 +89,26 @@ const Menu = () => {
     setOrdersLoading(true);
     setOrdersError("");
     try {
-      const response = await getOrdersByTable(tableNumber);
+    const response = await getOrdersByTable(tableNumber);
+    
+    // Calculate breakdown for each order (matches CartContext logic)
+    const ordersWithBreakdown = response.data.map(order => {
+      const subtotal = order.orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const foodSubtotal = order.orderItems.reduce((sum, item) => {
+        const catName = item.product?.category?.name?.toLowerCase().replace(/\s+/g, '-');
+        return ['appetizers', 'main-dishes'].includes(catName) ? sum + item.price * item.quantity : sum;
+      }, 0);
+      const serviceCharge = foodSubtotal * 0.1;
+      
+      return {
+        ...order,
+        subtotal,
+        serviceCharge,
+        total: subtotal + serviceCharge
+      };
+    });
+    
+    setOrders(ordersWithBreakdown);
       if (response.success) {
         // Filter preparing, completed, and pending orders (waiting for cashier)
         let relevantOrders = response.data.filter(order => 
@@ -289,80 +308,132 @@ const Menu = () => {
       )}
 
       {/* Your Orders Section - only show if table scanned */}
-      {hasTableScanned && (
-        <motion.section 
-          className="bg-gradient-to-r from-orange-50 to-blue-50 border-b border-gray-200 py-6 px-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
-                <MdTableBar className="text-orange-600" />
-                Table {tableNumber} - Your Orders
-              </h2>
-              <motion.button
-                onClick={fetchOrders}
-                className="flex items-center gap-1 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <MdRefresh className="text-sm" />
-                Refresh
-              </motion.button>
-            </div>
+     {hasTableScanned && (
+  <motion.section 
+    className="bg-gradient-to-r from-orange-50 to-blue-50 border-b border-gray-200 py-6 px-4"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div className="max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <MdTableBar className="text-orange-600" />
+          Table {tableNumber} - Your Orders
+        </h2>
 
-            {ordersLoading ? (
-              <div className="text-center py-8">
-                <div className="h-6 w-6 border-2 border-orange-400 border-t-transparent rounded-full mx-auto mb-2 animate-spin" />
-                <p className="text-gray-500 text-sm">Loading orders...</p>
-              </div>
-            ) : ordersError ? (
-              <div className="text-center py-8 text-orange-600 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                {ordersError}. <button onClick={fetchOrders} className="underline font-medium hover:no-underline">Retry</button>
-              </div>
-            ) : orders.length === 0 ? (
-              <motion.div 
-                className="text-center py-12"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
+        <motion.button
+          onClick={fetchOrders}
+          className="flex items-center gap-1 bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition shadow-sm"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <MdRefresh className="text-sm" />
+          Refresh
+        </motion.button>
+      </div>
+
+      {ordersLoading ? (
+        <div className="text-center py-8">
+          <div className="h-6 w-6 border-2 border-orange-400 border-t-transparent rounded-full mx-auto mb-2 animate-spin" />
+          <p className="text-gray-500 text-sm">Loading orders...</p>
+        </div>
+
+      ) : ordersError ? (
+        <div className="text-center py-8 text-orange-600 bg-orange-50 border border-orange-200 rounded-lg p-4">
+          {ordersError}.{" "}
+          <button
+            onClick={fetchOrders}
+            className="underline font-medium hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+
+      ) : orders.length === 0 ? (
+        <motion.div 
+          className="text-center py-12"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <MdShoppingCart className="text-5xl text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-600 mb-2">
+            No orders yet
+          </h3>
+          <p className="text-gray-500">
+            Your orders will appear here once placed
+          </p>
+        </motion.div>
+
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {orders.map((order) => {
+            //  USE PRE-CALCULATED VALUES
+            const orderSubtotal = order.subtotal || 0;
+            const orderServiceCharge = order.serviceCharge || 0;
+            const orderTotal = order.total || 0;
+
+            return (
+              <motion.div
+                key={order.id}
+                className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all"
+                whileHover={{ y: -2 }}
               >
-                <MdShoppingCart className="text-5xl text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No orders yet</h3>
-                <p className="text-gray-500">Your orders will appear here once placed</p>
-              </motion.div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {orders.map((order) => (
-                  <motion.div
-                    key={order.id}
-                    className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all"
-                    whileHover={{ y: -2 }}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className="font-semibold text-gray-900 text-sm">Order #{order.orderNumber || order.id.slice(-4)}</p>
-                        <p className="text-xs text-gray-500">{new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                      </div>
-                      <StatusBadge status={order.status} />
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {order.orderItems?.map(item => `${item.quantity}x ${item.product?.name}`).join(', ') || 'Items'}
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      Order #{order.orderNumber || order.id.slice(-4)}
                     </p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-[#254F22]">
-                        ₱{order.orderItems?.reduce((sum, item) => sum + (item.price * item.quantity), 0)?.toFixed(2) || '0.00'}
-                      </span>
-                      <StatusBadge status={order.status} className="!text-sm px-3 py-1" />
+                    <p className="text-xs text-gray-500">
+                      {new Date(order.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                  {order.orderItems
+                    ?.map(
+                      (item) => `${item.quantity}x ${item.product?.name}`
+                    )
+                    .join(", ") || "Items"}
+                </p>
+
+                <div className="flex justify-between items-center">
+                  <div className="space-y-1 text-right">
+                    <div className="text-sm text-gray-600 flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>₱{orderSubtotal.toFixed(2)}</span>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </div>
-        </motion.section>
+
+                    {orderServiceCharge > 0 && (
+                      <div className="text-sm text-emerald-600 font-medium flex justify-between">
+                        <span>Service (10%):</span>
+                        <span>+₱{orderServiceCharge.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <span className="text-lg font-bold text-[#254F22] block">
+                      TOTAL: ₱{orderTotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <StatusBadge
+                    status={order.status}
+                    className="!text-sm px-3 py-1"
+                  />
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
       )}
+    </div>
+  </motion.section>
+)}
 
       {/* Category Tabs */}
       <section className="bg-white shadow-md sticky top-0 z-10 border-y border-[#254F22]/10">

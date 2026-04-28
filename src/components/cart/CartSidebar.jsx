@@ -69,7 +69,8 @@ const CartSidebar = () => {
         paymentDetails.paymentMethod, 
         paymentDetails.referenceNo,
         paymentDetails.amountTendered,
-        customerType
+        customerType,
+        paymentDetails.breakdown  // Pass breakdown to API
       );
 
       if (response.success) {

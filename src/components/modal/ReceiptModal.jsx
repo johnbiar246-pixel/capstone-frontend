@@ -222,11 +222,17 @@ doc.save(`receipt-${receiptData?.orderNumber || receiptData?.orderId || orderId}
                         </div>
                         {receiptData.discount > 0 && (
                           <div className="flex justify-between text-green-600">
-                            <span>Discount:</span>
+                            <span>Discount (20% food):</span>
                             <span>-₱{receiptData.discount.toFixed(2)}</span>
                           </div>
                         )}
-                        <div className="flex justify-between">
+                        {receiptData.foodSubtotal > 0 && receiptData.nonFoodSubtotal > 0 && (
+                          <div className="flex justify-between text-gray-600 text-xs">
+                            <span>Food: ₱{receiptData.foodSubtotal.toFixed(2)}</span>
+                            <span>Non-Food: ₱{receiptData.nonFoodSubtotal.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold">
                           <span>Service Charge:</span>
                           <span>₱{receiptData.serviceCharge.toFixed(2)}</span>
                         </div>

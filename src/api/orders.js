@@ -9,6 +9,7 @@ export const createOrder = async (
   referenceNo = null,
   amountTendered = null,
   customerType = "REGULAR",
+  breakdown = null,  // New: full breakdown from CartContext
 ) => {
   try {
     // Get userId if available (for logged in users), otherwise use guest mode
@@ -23,6 +24,13 @@ export const createOrder = async (
       tableId,
       status,
       customerType,
+      ...(breakdown && {
+        foodSubtotal: breakdown.foodSubtotal,
+        nonFoodSubtotal: breakdown.nonFoodSubtotal,
+        discount: breakdown.discount,
+        serviceCharge: breakdown.serviceCharge,
+        totalAmount: breakdown.total,
+      }),
       ...(paymentMethod && { paymentMethod }),
       ...(referenceNo && { referenceNo }),
       ...(amountTendered && { amountTendered }),

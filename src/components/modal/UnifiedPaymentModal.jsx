@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useCart } from "../../contexts/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { MdClose, MdPayments, MdAttachMoney, MdReceiptLong, MdInfo, MdPerson, MdAccessibility } from "react-icons/md";
 import { FaMoneyBillWave } from "react-icons/fa";
@@ -14,49 +15,23 @@ const UnifiedPaymentModal = ({
   customerType: initialCustomerType = "REGULAR",
   tableNumber = null
 }) => {
-  const [amountTendered, setAmountTendered] = useState("");
+const [amountTendered, setAmountTendered] = useState("");
   const [customerType, setCustomerType] = useState(initialCustomerType);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [breakdown, setBreakdown] = useState({
-    subtotal: 0,
-    foodSubtotal: 0,
-    discount: 0,
-    serviceCharge: 0,
-    total: 0
-  });
   const [changeAmount, setChangeAmount] = useState(0);
+  const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCharge: 0, total: 0 });
 
-  const isFoodItem = (item) => {
-    const categoryName = item.category?.name?.toLowerCase() || '';
-    return ['appetizers', 'main-dishes'].includes(categoryName);
-  };
-
-  const calculateBreakdown = (items, custType) => {
-    let subtotal = 0;
-    let foodSubtotal = 0;
-
-    items.forEach(item => {
-      const itemTotal = item.price * item.quantity;
-      subtotal += itemTotal;
-      if (isFoodItem(item)) {
-        foodSubtotal += itemTotal;
-      }
-    });
-
-    const discount = (custType === 'PWD' || custType === 'SENIOR') ? foodSubtotal * 0.2 : 0;
-    const serviceCharge = foodSubtotal * 0.1;
-    const total = subtotal + serviceCharge - discount;
-
-    return { subtotal, foodSubtotal, discount, serviceCharge, total };
-  };
+  const { calculateCartBreakdown } = useCart();
 
   useEffect(() => {
-    if (cartItems.length > 0) {
-      const newBreakdown = calculateBreakdown(cartItems, customerType);
-      setBreakdown(newBreakdown);
+    const newBreakdown = cartItems.length > 0 
+      ? calculateCartBreakdown(cartItems, customerType)
+      : { subtotal: 0, discount: 0, serviceCharge: 0, total: 0 };
+    setBreakdown(newBreakdown);
+    if (newBreakdown.total > 0) {
       setAmountTendered(newBreakdown.total.toFixed(2));
     }
-  }, [cartItems, customerType]);
+  }, [cartItems, customerType, calculateCartBreakdown]);
 
   useEffect(() => {
     const displayTotal = rawTotal || breakdown.total;
@@ -79,6 +54,7 @@ const UnifiedPaymentModal = ({
         paymentMethod: "CASH",
         amountTendered: tendered,
         customerType,
+        breakdown,  // Full breakdown for order submission
         orderId,
         tableNumber,
         mode
@@ -161,7 +137,7 @@ const UnifiedPaymentModal = ({
                   </div>
                 )}
                 <div className="flex justify-between py-1 text-emerald-600 font-semibold bg-emerald-50 px-3 rounded-lg">
-                  <span>Service Charge (10% food)</span>
+                  <span>Service Charge (10% after discount)</span>
                   <span>+₱{breakdown.serviceCharge.toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-4 mt-3">
@@ -216,6 +192,7 @@ const UnifiedPaymentModal = ({
               <div className="relative">
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min={displayTotal}
                   value={amountTendered}
@@ -224,6 +201,7 @@ const UnifiedPaymentModal = ({
                   placeholder={`Minimum: ₱${displayTotal.toFixed(2)}`}
                   className="w-full px-6 py-5 rounded-2xl border-4 border-emerald-200 focus:border-emerald-400 focus:outline-none transition-all text-2xl font-bold text-right bg-emerald-50 shadow-lg hover:shadow-xl"
                 />
+
               </div>
             </div>
 

@@ -58,7 +58,7 @@ export const CartProvider = ({ children }) => {
   };
 
   // Calculate pricing breakdown (matches backend logic)
-  const calculateCartBreakdown = (items = cart, custType = customerType) => {
+const calculateCartBreakdown = (items = cart, custType = customerType) => {
     let subtotal = 0;
     let foodSubtotal = 0;
 
@@ -74,18 +74,23 @@ export const CartProvider = ({ children }) => {
       }
     });
 
-    const discount = (custType === 'PWD' || custType === 'SENIOR') 
+    const discountAmount = (custType === 'PWD' || custType === 'SENIOR') 
       ? foodSubtotal * 0.2 
       : 0;
-    const serviceCharge = foodSubtotal * 0.1;
-    const total = subtotal + serviceCharge - discount;
+    
+    const applicableAmount = subtotal - discountAmount;
+    const serviceCharge = applicableAmount * 0.1;
+    const total = applicableAmount + serviceCharge;
+
+    const nonFoodSubtotal = subtotal - foodSubtotal;
 
     return { 
-      subtotal: subtotal.toFixed(2), 
-      foodSubtotal: foodSubtotal.toFixed(2),
-      discount: discount.toFixed(2), 
-      serviceCharge: serviceCharge.toFixed(2),
-      total: total.toFixed(2)
+      subtotal: parseFloat(subtotal.toFixed(2)), 
+      foodSubtotal: parseFloat(foodSubtotal.toFixed(2)),
+      nonFoodSubtotal: parseFloat(nonFoodSubtotal.toFixed(2)),
+      discount: parseFloat(discountAmount.toFixed(2)), 
+      serviceCharge: parseFloat(serviceCharge.toFixed(2)),
+      total: parseFloat(total.toFixed(2))
     };
   };
 
@@ -131,6 +136,7 @@ export const CartProvider = ({ children }) => {
     referenceNo = null,
     amountTendered = null,
     customerTypeParam = null,
+    breakdown = null,  // New: accept breakdown param
   ) => {
     const finalCustomerType = customerTypeParam || customerType;
     if (cart.length === 0) {
@@ -146,7 +152,7 @@ export const CartProvider = ({ children }) => {
 
     // Call API to create order (not sale yet - will become sale when completed)
     // Note: For customer orders, paymentMethod and referenceNo are stored but not required
-    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo, amountTendered, finalCustomerType);
+    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo, amountTendered, finalCustomerType, breakdown);
 
     // Clear cart after successful order
     if (response.success) {
