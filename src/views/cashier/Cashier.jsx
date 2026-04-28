@@ -468,6 +468,7 @@ const Cashier = () => {
         cartItems={cart}
         customerType={customerType}
         tableNumber={tables.find(t => t.id === selectedTableId)?.number}
+        autoFill={false}
       />
 
       {/* Receipt Modal */}

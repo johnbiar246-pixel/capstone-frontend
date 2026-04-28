@@ -289,11 +289,12 @@ const CartSidebar = () => {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         onConfirm={handlePaymentConfirm}
+        totalAmount={getCartTotal()}
         cartItems={cart}
         customerType={customerType}
-        setCustomerType={setCustomerType}
         tableNumber={tableNumber}
         mode="customer-new"
+        autoFill={false}
       />
 
       {/* Notification Toast */}

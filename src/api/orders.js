@@ -95,12 +95,14 @@ export const updateOrderStatus = async (
   status,
   paymentMethod = null,
   referenceNo = null,
+  amountTendered = null,
 ) => {
   try {
     const response = await API.patch(`/orders/${orderId}/status`, {
       status,
       ...(paymentMethod && { paymentMethod }),
       ...(referenceNo && { referenceNo }),
+      ...(amountTendered && { amountTendered }),
     });
     return response.data;
   } catch (error) {

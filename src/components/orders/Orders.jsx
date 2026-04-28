@@ -11,6 +11,7 @@ import {
   MdRestaurantMenu,
   MdExpandMore,
   MdExpandLess,
+  MdAttachMoney,
 } from "react-icons/md";
 import { FaGlassCheers } from "react-icons/fa";
 import { getTableByNumber } from "../../api/tables";
@@ -105,8 +106,9 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
-  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+const [showUnifiedModal, setShowUnifiedModal] = useState(false);
 const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+const [unifiedLoading, setUnifiedLoading] = useState(false);
 
   // Tender Modal states
   const [showTenderModal, setShowTenderModal] = useState(false);
@@ -169,6 +171,16 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
           nonFoodSubtotal: order.nonFoodSubtotal || 0,
           discount: order.discount || 0,
           serviceCharge: order.serviceCharge || 0,
+          amountTendered: order.amountTendered || 0,
+          customerType: order.customerType || 'REGULAR',
+          // Transform orderItems to match CartContext cart format for modal
+          orderItems: order.orderItems.map(item => ({
+            id: item.productId,
+            name: item.product?.name || 'Item',
+            price: item.price,
+            quantity: item.quantity,
+            category: item.product?.category || { name: '' }
+          })),
           total: order.orderItems.reduce(
             (sum, item) => sum + item.price * item.quantity,
             0,
@@ -219,23 +231,31 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
     navigate("/user/orders");
   };
 
-  const handleAcceptClick = (orderId) => {
+const handleAcceptClick = (orderId) => {
     const order = orders.find((o) => o.id === orderId);
     if (order.status === "pending") {
-      setSelectedOrderForPayment(order);
+      setSelectedOrderForPayment({
+        ...order,
+        totalAmount: order.total
+      });
       setShowUnifiedModal(true);
     } else if (order.status === "preparing") {
       handleCompleteOrder(orderId);
     }
   };
 
-  const handleUnifiedConfirm = async (total, paymentDetails) => {
+const handleUnifiedConfirm = async (total, paymentDetails) => {
     if (!selectedOrderForPayment) return;
 
+    setUnifiedLoading(true);
+
+    console.log("Unified confirm called with:", paymentDetails);
+    
     const token = localStorage.getItem("token");
     if (!token) {
       showNotification("Please log in to accept orders.", "error");
       navigate("/login");
+      setUnifiedLoading(false);
       return;
     }
 
@@ -247,6 +267,8 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
         paymentDetails.referenceNo,
         paymentDetails.amountTendered
       );
+      console.log("Update status response:", response);
+      
       if (response.success) {
         setOrders(
           orders.map((order) =>
@@ -265,11 +287,13 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
       }
     } catch (err) {
       console.error("Error accepting order:", err);
-      let errorMessage = err.message || "Failed to accept order. Please try again.";
+      let errorMessage = err.response?.data?.message || err.message || "Failed to accept order. Please try again.";
       if (err.response?.status === 401) {
         setTimeout(() => navigate("/login"), 2000);
       }
       showNotification(errorMessage, "error");
+    } finally {
+      setUnifiedLoading(false);
     }
   };
 
@@ -542,27 +566,41 @@ const handleCancelClick = (orderId) => {
         </div>
       )}
 
-      {order.foodSubtotal && order.serviceCharge && (
-        <div className="space-y-1 mb-2 text-xs text-gray-600">
-          <div className="flex justify-between">
-            <span>Food Subtotal:</span>
-            <span>₱{order.foodSubtotal.toFixed(2)}</span>
+{order.status !== 'preparing' && (
+  <>
+    {/* Bill Total */}
+    <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-sm font-medium text-gray-700">Service Charge:</span>
+        <span className="text-sm font-semibold text-emerald-700">+₱{order.serviceCharge.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between items-center pt-1 border-t border-emerald-200">
+        <span className="text-lg font-bold text-gray-900">Total Bill</span>
+        <span className="text-xl font-black text-emerald-600">₱{order.totalAmount.toFixed(2)}</span>
+      </div>
+      {/* Amount Tendered Display - Read-only for PREPARING/COMPLETED */}
+      {(order.status === 'preparing' || order.status === 'completed') && order.amountTendered > 0 && (
+        <div className="flex flex-col gap-1 pt-2 mt-2 border-t border-emerald-200 bg-emerald-25 rounded-lg p-2">
+          <div className="flex justify-between items-center text-sm">
+            <span className="font-semibold text-emerald-800 flex items-center gap-1">
+              <MdAttachMoney className="text-emerald-600" />
+              Amount Tendered
+            </span>
+            <span className="font-bold text-emerald-700">₱{order.amountTendered.toFixed(2)}</span>
           </div>
-          {order.discount > 0 && (
-            <div className="flex justify-between text-green-600 font-semibold">
-              <span>Discount:</span>
-              <span>-₱{order.discount.toFixed(2)}</span>
+          {order.amountTendered > order.totalAmount && (
+            <div className="flex justify-between items-center text-xs bg-emerald-100 px-2 py-1 rounded">
+              <span className="text-emerald-800 font-medium">Change Due</span>
+              <span className="font-bold text-emerald-700">
+                ₱{(order.amountTendered - order.totalAmount).toFixed(2)}
+              </span>
             </div>
           )}
-          <div className="flex justify-between">
-            <span>Service:</span>
-            <span>₱{order.serviceCharge.toFixed(2)}</span>
-          </div>
         </div>
       )}
-      <p className="text-base sm:text-lg font-bold text-green-600">
-        Total: ₱{order.totalAmount || order.total?.toFixed(2)}
-      </p>
+    </div>
+  </>
+)}
 
       {/* Action Buttons - Smaller on mobile */}
       {(order.status === "pending" || order.status === "preparing") && (
@@ -848,6 +886,22 @@ const handleCancelClick = (orderId) => {
         onConfirm={handleCancelConfirm}
         orderNumber={pendingCancelOrder?.orderNumber || pendingCancelOrderId?.slice(-4)}
         orderDetails={pendingCancelOrder?.details || 'Order details not available'}
+      />
+
+      {/* Unified Payment Modal for Accept */}
+      <UnifiedPaymentModal
+        isOpen={showUnifiedModal}
+        onClose={() => {
+          setShowUnifiedModal(false);
+          setSelectedOrderForPayment(null);
+        }}
+        onConfirm={handleUnifiedConfirm}
+        orderItems={selectedOrderForPayment?.orderItems || []}
+        customerType={selectedOrderForPayment?.customerType || 'REGULAR'}
+        totalAmount={selectedOrderForPayment?.totalAmount || selectedOrderForPayment?.total || 0}
+        orderId={selectedOrderForPayment?.orderNumber || selectedOrderForPayment?.id?.slice(-4)}
+        tableNumber={selectedOrderForPayment?.tableNumber}
+        mode="staff-accept"
       />
 
     </motion.div>

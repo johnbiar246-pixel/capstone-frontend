@@ -66,12 +66,14 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
       const itemTotal = item.price * item.quantity;
       subtotal += itemTotal;
       // Food items: appetizers, main-dishes (matches backend)
-      const isFood = ['appetizers', 'main-dishes'].includes(
-        (item.category?.name || '').toLowerCase()
-      );
+      const catName = (item.category?.name || '').toLowerCase();
+      const catId = (item.categoryId || '').toLowerCase();
+      const isFood = ['appetizers', 'main-dishes'].includes(catName) || ['appetizers', 'main-dishes'].includes(catId);
+      console.log(`Item ${item.name}: catName="${catName}", catId="${catId}", isFood=${isFood}, itemTotal=${itemTotal}`);
       if (isFood) {
         foodSubtotal += itemTotal;
       }
+
     });
 
     const discountAmount = (custType === 'PWD' || custType === 'SENIOR') 

@@ -10,41 +10,73 @@ const UnifiedPaymentModal = ({
   onConfirm,
   totalAmount: rawTotal, 
   cartItems = [], 
+  orderItems = [], 
   orderId = null,
   mode = "customer-new", 
   customerType: initialCustomerType = "REGULAR",
-  tableNumber = null
+  tableNumber = null,
+  autoFill = true
 }) => {
 const [amountTendered, setAmountTendered] = useState("");
   const [customerType, setCustomerType] = useState(initialCustomerType);
   const [isProcessing, setIsProcessing] = useState(false);
   const [changeAmount, setChangeAmount] = useState(0);
-  const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCharge: 0, total: 0 });
+const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCharge: 0, total: 0 });
+  const [total, setTotal] = useState(0);
 
   const { calculateCartBreakdown } = useCart();
 
   useEffect(() => {
-    const newBreakdown = cartItems.length > 0 
-      ? calculateCartBreakdown(cartItems, customerType)
-      : { subtotal: 0, discount: 0, serviceCharge: 0, total: 0 };
+    let subtotal, discountAmount, serviceChargeAmount, totalAmount;
+    
+    // Determine items to use for calculation
+    const itemsToUse = cartItems.length > 0 ? cartItems : orderItems;
+    
+    if (itemsToUse.length > 0) {
+      // Use CartContext breakdown logic for both customer-new and staff-accept
+      const breakdown = calculateCartBreakdown(itemsToUse, customerType);
+      subtotal = breakdown.subtotal;
+      discountAmount = breakdown.discount;
+      serviceChargeAmount = breakdown.serviceCharge;
+      totalAmount = breakdown.total;
+    } else if (rawTotal > 0) {
+      // Fallback for rawTotal without items
+      subtotal = rawTotal;
+      discountAmount = customerType !== 'REGULAR' ? rawTotal * 0.2 : 0;
+      const applicable = subtotal - discountAmount;
+      serviceChargeAmount = applicable * 0.1;
+      totalAmount = applicable + serviceChargeAmount;
+    } else {
+      subtotal = 0;
+      discountAmount = 0;
+      serviceChargeAmount = 0;
+      totalAmount = 0;
+    }
+
+    const newBreakdown = {
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      discount: parseFloat(discountAmount.toFixed(2)),
+      serviceCharge: parseFloat(serviceChargeAmount.toFixed(2)),
+      total: parseFloat(totalAmount.toFixed(2))
+    };
+    
     setBreakdown(newBreakdown);
-    if (newBreakdown.total > 0) {
+    setTotal(newBreakdown.total);
+    if (newBreakdown.total > 0 && autoFill && amountTendered === "") {
       setAmountTendered(newBreakdown.total.toFixed(2));
     }
-  }, [cartItems, customerType, calculateCartBreakdown]);
+  }, [cartItems, orderItems, customerType, rawTotal, calculateCartBreakdown, autoFill, amountTendered]);
 
   useEffect(() => {
-    const displayTotal = rawTotal || breakdown.total;
     const tendered = parseFloat(amountTendered) || 0;
-    setChangeAmount(tendered - displayTotal);
-  }, [amountTendered, rawTotal, breakdown.total]);
+    setChangeAmount(tendered - total);
+  }, [amountTendered, total]);
 
   const handleConfirm = async () => {
-    const displayTotal = rawTotal || breakdown.total;
     const tendered = parseFloat(amountTendered) || 0;
     
-    if (tendered < displayTotal) {
-      alert(`Amount tendered (₱${tendered.toFixed(2)}) must be >= total (₱${displayTotal.toFixed(2)})`);
+    if (tendered < total) {
+      alert(`Amount tendered (₱${tendered.toFixed(2)}) must be >= total (₱${total.toFixed(2)})`);
       return;
     }
 
@@ -59,7 +91,7 @@ const [amountTendered, setAmountTendered] = useState("");
         tableNumber,
         mode
       };
-      await onConfirm(displayTotal, paymentDetails);
+      await onConfirm(total, paymentDetails);
     } catch (error) {
       alert("Payment failed. Please try again.");
     } finally {
@@ -85,8 +117,6 @@ const [amountTendered, setAmountTendered] = useState("");
     { value: "PWD", label: "PWD (20% food discount)", icon: MdAccessibility },
     { value: "SENIOR", label: "Senior (20% food discount)", icon: MdAccessibility }
   ];
-
-  const displayTotal = rawTotal || breakdown.total;
 
   if (!isOpen) return null;
 
@@ -143,8 +173,8 @@ const [amountTendered, setAmountTendered] = useState("");
                 <div className="border-t pt-4 mt-3">
                   <div className="flex justify-between items-end pb-2">
                     <span className="text-2xl font-black text-gray-900">TOTAL</span>
-                    <span className="text-3xl font-black text-emerald-600">
-                      ₱{displayTotal.toFixed(2)}
+                  <span className="text-3xl font-black text-emerald-600">
+                      ₱{total.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -190,15 +220,15 @@ const [amountTendered, setAmountTendered] = useState("");
                 Amount Tendered
               </label>
               <div className="relative">
-                <input
+                  <input
                   type="number"
                   inputMode="decimal"
                   step="0.01"
-                  min={displayTotal}
+                  min={total}
                   value={amountTendered}
                   onChange={(e) => setAmountTendered(e.target.value)}
                   disabled={isProcessing}
-                  placeholder={`Minimum: ₱${displayTotal.toFixed(2)}`}
+                  placeholder={`Minimum: ₱${total.toFixed(2)}`}
                   className="w-full px-6 py-5 rounded-2xl border-4 border-emerald-200 focus:border-emerald-400 focus:outline-none transition-all text-2xl font-bold text-right bg-emerald-50 shadow-lg hover:shadow-xl"
                 />
 
