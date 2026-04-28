@@ -160,18 +160,22 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
       const response = await getUserOrders();
       if (response.data && response.data.success) {
         // Transform API data to match component format
-        const transformedOrders = response.data.data.map((order) => ({
+        const transformedOrders = response.data.data.map((order) => {
+          // Safe number parsing with nullish coalescing for all breakdown fields
+          const safeNum = (val) => Number(val ?? 0);
+          
+          return {
           id: order.id.toString(),
           orderNumber: order.orderNumber,
           details: order.orderItems
             .map((item) => `${item.quantity}x ${item.product?.name || "Item"}`)
             .join(", "),
-          totalAmount: order.totalAmount,
-          foodSubtotal: order.foodSubtotal || 0,
-          nonFoodSubtotal: order.nonFoodSubtotal || 0,
-          discount: order.discount || 0,
-          serviceCharge: order.serviceCharge || 0,
-          amountTendered: order.amountTendered || 0,
+          totalAmount: safeNum(order.totalAmount),
+          foodSubtotal: safeNum(order.foodSubtotal),
+          nonFoodSubtotal: safeNum(order.nonFoodSubtotal),
+          discount: safeNum(order.discount),
+          serviceCharge: safeNum(order.serviceCharge),
+          amountTendered: safeNum(order.amountTendered),
           customerType: order.customerType || 'REGULAR',
           // Transform orderItems to match CartContext cart format for modal
           orderItems: order.orderItems.map(item => ({
@@ -194,7 +198,8 @@ const [selectedReceiptOrderId, setSelectedReceiptOrderId] = useState(null);
           tableNumber: order.table?.number || "N/A",
           paymentMethod: order.paymentMethod,
           referenceNo: order.referenceNo,
-        }));
+        }
+        });
         setOrders(transformedOrders);
       }
     } catch (err) {
@@ -572,11 +577,11 @@ const handleCancelClick = (orderId) => {
     <div className="mt-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
       <div className="flex justify-between items-center mb-1">
         <span className="text-sm font-medium text-gray-700">Service Charge:</span>
-        <span className="text-sm font-semibold text-emerald-700">+₱{order.serviceCharge.toFixed(2)}</span>
+        <span className="text-sm font-semibold text-emerald-700">+₱{Number(order.serviceCharge ?? 0).toFixed(2)}</span>
       </div>
       <div className="flex justify-between items-center pt-1 border-t border-emerald-200">
         <span className="text-lg font-bold text-gray-900">Total Bill</span>
-        <span className="text-xl font-black text-emerald-600">₱{order.totalAmount.toFixed(2)}</span>
+        <span className="text-xl font-black text-emerald-600">₱{Number(order.totalAmount ?? 0).toFixed(2)}</span>
       </div>
       {/* Amount Tendered Display - Read-only for PREPARING/COMPLETED */}
       {(order.status === 'preparing' || order.status === 'completed') && order.amountTendered > 0 && (
@@ -586,13 +591,13 @@ const handleCancelClick = (orderId) => {
               <MdAttachMoney className="text-emerald-600" />
               Amount Tendered
             </span>
-            <span className="font-bold text-emerald-700">₱{order.amountTendered.toFixed(2)}</span>
+            <span className="font-bold text-emerald-700">₱{Number(order.amountTendered ?? 0).toFixed(2)}</span>
           </div>
           {order.amountTendered > order.totalAmount && (
             <div className="flex justify-between items-center text-xs bg-emerald-100 px-2 py-1 rounded">
               <span className="text-emerald-800 font-medium">Change Due</span>
               <span className="font-bold text-emerald-700">
-                ₱{(order.amountTendered - order.totalAmount).toFixed(2)}
+                ₱{Number((order.amountTendered ?? 0) - (order.totalAmount ?? 0)).toFixed(2)}
               </span>
             </div>
           )}
