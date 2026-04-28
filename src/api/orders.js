@@ -8,6 +8,7 @@ export const createOrder = async (
   paymentMethod = null,
   referenceNo = null,
   amountTendered = null,
+  customerType = "REGULAR",
 ) => {
   try {
     // Get userId if available (for logged in users), otherwise use guest mode
@@ -21,12 +22,23 @@ export const createOrder = async (
       items,
       tableId,
       status,
+      customerType,
       ...(paymentMethod && { paymentMethod }),
       ...(referenceNo && { referenceNo }),
       ...(amountTendered && { amountTendered }),
     };
 
     const response = await API.post("/orders", requestData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Get receipt for order
+export const getReceipt = async (orderId) => {
+  try {
+    const response = await API.post(`/orders/${orderId}/receipt`);
     return response.data;
   } catch (error) {
     throw error;
@@ -90,8 +102,10 @@ export const updateOrderStatus = async (
 
 export default {
   createOrder,
+  getReceipt,
   getOrders,
   getUserOrders,
   getOrdersByTable,
   updateOrderStatus,
 };
+

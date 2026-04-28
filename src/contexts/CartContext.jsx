@@ -13,13 +13,28 @@ export const useCart = () => {
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
-    // Load cart from localStorage on initial render
+// Load cart from localStorage on initial render
     if (typeof window !== "undefined") {
       const savedCart = localStorage.getItem("cart");
       return savedCart ? JSON.parse(savedCart) : [];
     }
     return [];
   });
+
+  const [customerType, setCustomerType] = useState("REGULAR");
+
+  // Persist customerType to localStorage
+  useEffect(() => {
+    localStorage.setItem("customerType", customerType);
+  }, [customerType]);
+
+  // Load customerType on init
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const savedType = localStorage.getItem("customerType") || "REGULAR";
+      setCustomerType(savedType);
+    }
+  }, []); 
 
   const [isCartOpen, setIsCartOpen] = useState(false);
 
@@ -42,6 +57,43 @@ export const CartProvider = ({ children }) => {
     });
   };
 
+  // Calculate pricing breakdown (matches backend logic)
+  const calculateCartBreakdown = (items = cart, custType = customerType) => {
+    let subtotal = 0;
+    let foodSubtotal = 0;
+
+    items.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      subtotal += itemTotal;
+      // Food items: appetizers, main-dishes (matches backend)
+      const isFood = ['appetizers', 'main-dishes'].includes(
+        (item.category?.name || '').toLowerCase()
+      );
+      if (isFood) {
+        foodSubtotal += itemTotal;
+      }
+    });
+
+    const discount = (custType === 'PWD' || custType === 'SENIOR') 
+      ? foodSubtotal * 0.2 
+      : 0;
+    const serviceCharge = foodSubtotal * 0.1;
+    const total = subtotal + serviceCharge - discount;
+
+    return { 
+      subtotal: subtotal.toFixed(2), 
+      foodSubtotal: foodSubtotal.toFixed(2),
+      discount: discount.toFixed(2), 
+      serviceCharge: serviceCharge.toFixed(2),
+      total: total.toFixed(2)
+    };
+  };
+
+  const getCartTotal = () => {
+    const breakdown = calculateCartBreakdown();
+    return parseFloat(breakdown.total);
+  };
+
   const removeFromCart = (productId) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
   };
@@ -62,9 +114,7 @@ export const CartProvider = ({ children }) => {
     setCart([]);
   };
 
-  const getCartTotal = () => {
-    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
-  };
+  // Remove duplicate getCartTotal - using breakdown version above
 
   const getCartItemCount = () => {
     return cart.reduce((count, item) => count + item.quantity, 0);
@@ -80,7 +130,9 @@ export const CartProvider = ({ children }) => {
     paymentMethod = null,
     referenceNo = null,
     amountTendered = null,
+    customerTypeParam = null,
   ) => {
+    const finalCustomerType = customerTypeParam || customerType;
     if (cart.length === 0) {
       throw new Error("Cart is empty");
     }
@@ -94,7 +146,7 @@ export const CartProvider = ({ children }) => {
 
     // Call API to create order (not sale yet - will become sale when completed)
     // Note: For customer orders, paymentMethod and referenceNo are stored but not required
-    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo);
+    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo, amountTendered, finalCustomerType);
 
     // Clear cart after successful order
     if (response.success) {
@@ -107,6 +159,9 @@ export const CartProvider = ({ children }) => {
 
   const value = {
     cart,
+    customerType,
+    setCustomerType,
+    calculateCartBreakdown,
     isCartOpen,
     addToCart,
     removeFromCart,

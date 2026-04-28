@@ -12,12 +12,15 @@ import {
   MdWineBar,
 } from "react-icons/md";
 import { useCart } from "../../contexts/CartContext";
-import PaymentMethodModal from "../modal/PaymentMethodModal";
+import UnifiedPaymentModal from "../modal/UnifiedPaymentModal";
 import { getTableByNumber } from "../../api/tables";
 
 const CartSidebar = () => {
   const {
     cart,
+    customerType,
+    setCustomerType,
+    calculateCartBreakdown,
     isCartOpen,
     closeCart,
     removeFromCart,
@@ -50,7 +53,7 @@ const CartSidebar = () => {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const handlePaymentConfirm = async (paymentMethod, referenceNo, amountTendered) => {
+  const handlePaymentConfirm = async (total, paymentDetails) => {
     try {
       // Fetch table data to get the UUID
       const tableResponse = await getTableByNumber(tableNumber);
@@ -59,20 +62,24 @@ const CartSidebar = () => {
         return;
       }
 
-      const tableId = tableResponse.data.id; // This is the UUID
+      const tableId = tableResponse.data.id;
 
-      // Create order with payment method (payment will be handled when staff marks as completed)
-      const response = await placeOrder(tableId, paymentMethod, referenceNo);
+      const response = await placeOrder(
+        tableId, 
+        paymentDetails.paymentMethod, 
+        paymentDetails.referenceNo,
+        paymentDetails.amountTendered,
+        customerType
+      );
 
       if (response.success) {
         showNotification(
-          "Order placed successfully! Staff will review your order shortly.",
+          "Order placed successfully with discount & service charge! Staff will review shortly.",
           "success",
         );
         setShowPaymentModal(false);
         clearCart();
         closeCart();
-        // Stay on menu page - no redirect needed for guest users
       } else {
         showNotification(
           response.message || "Failed to place order. Please try again.",
@@ -276,12 +283,16 @@ const CartSidebar = () => {
         </>
       )}
 
-      {/* Payment Method Modal */}
-      <PaymentMethodModal
+      {/* Unified Payment Modal */}
+      <UnifiedPaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         onConfirm={handlePaymentConfirm}
-        totalAmount={getCartTotal()}
+        cartItems={cart}
+        customerType={customerType}
+        setCustomerType={setCustomerType}
+        tableNumber={tableNumber}
+        mode="customer-new"
       />
 
       {/* Notification Toast */}

@@ -15,8 +15,8 @@ import {
 import { FaGlassCheers } from "react-icons/fa";
 import { getTableByNumber } from "../../api/tables";
 import { getUserOrders, updateOrderStatus } from "../../api/orders";
+import UnifiedPaymentModal from "../modal/UnifiedPaymentModal";
 import TenderModal from "../modal/TenderModal";
-import PaymentMethodModal from "../modal/PaymentMethodModal";
 
 // Notification component
 const Notification = ({ notification, onClose }) => {
@@ -102,11 +102,12 @@ const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
 
-// Tender modal state
+  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
+
+  // Tender Modal states
   const [showTenderModal, setShowTenderModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [selectedOrderForPayment, setSelectedOrderForPayment] = useState(null);
 
   // Notification state
   const [notification, setNotification] = useState(null);
@@ -201,19 +202,16 @@ const Orders = () => {
   const handleAcceptClick = (orderId) => {
     const order = orders.find((o) => o.id === orderId);
     if (order.status === "pending") {
-      // Open payment method modal for pending orders
       setSelectedOrderForPayment(order);
-      setShowPaymentModal(true);
+      setShowUnifiedModal(true);
     } else if (order.status === "preparing") {
-      // Directly complete preparing orders (payment method already stored)
       handleCompleteOrder(orderId);
     }
   };
 
-  const handleAcceptPayment = async (paymentMethod, referenceNo, amountTendered) => {
+  const handleUnifiedConfirm = async (total, paymentDetails) => {
     if (!selectedOrderForPayment) return;
 
-    // Check if user is authenticated
     const token = localStorage.getItem("token");
     if (!token) {
       showNotification("Please log in to accept orders.", "error");
@@ -225,36 +223,30 @@ const Orders = () => {
       const response = await updateOrderStatus(
         selectedOrderForPayment.id,
         "PREPARING",
-        paymentMethod,
-        referenceNo,
-        amountTendered
+        paymentDetails.paymentMethod,
+        paymentDetails.referenceNo,
+        paymentDetails.amountTendered
       );
       if (response.success) {
         setOrders(
           orders.map((order) =>
             order.id === selectedOrderForPayment.id
-              ? { ...order, status: "preparing", paymentMethod, referenceNo, amountTendered }
+              ? { ...order, status: "preparing", paymentMethod: paymentDetails.paymentMethod, referenceNo: paymentDetails.referenceNo, amountTendered: paymentDetails.amountTendered }
               : order,
           ),
         );
-        setShowPaymentModal(false);
+        setShowUnifiedModal(false);
         setSelectedOrderForPayment(null);
-        showNotification("Order accepted and moved to preparing!", "success");
+        showNotification("Order accepted and moved to preparing! Receipt generated.", "success");
       } else {
         showNotification(response.message || "Failed to accept order", "error");
       }
     } catch (err) {
       console.error("Error accepting order:", err);
-
-      // Use error message from axios interceptor if available
-      let errorMessage =
-        err.message || "Failed to accept order. Please try again.";
-
-      // Handle specific auth errors
+      let errorMessage = err.message || "Failed to accept order. Please try again.";
       if (err.response?.status === 401) {
         setTimeout(() => navigate("/login"), 2000);
       }
-
       showNotification(errorMessage, "error");
     }
   };
@@ -763,18 +755,6 @@ const Orders = () => {
         orderId={selectedOrder?.orderNumber || selectedOrder?.id}
       />
 
-      {/* Payment Method Modal for accepting orders */}
-      <PaymentMethodModal
-        isOpen={showPaymentModal}
-        onClose={() => {
-          setShowPaymentModal(false);
-          setSelectedOrderForPayment(null);
-        }}
-        onConfirm={handleAcceptPayment}
-        totalAmount={selectedOrderForPayment?.total || 0}
-        mode="staff"
-        orderId={selectedOrderForPayment?.orderNumber || selectedOrderForPayment?.id}
-      />
     </motion.div>
   );
 };

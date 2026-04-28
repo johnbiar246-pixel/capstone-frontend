@@ -18,6 +18,8 @@ import {
 import { getProducts, getCategories } from "../../api/products.js";
 import { createOrder } from "../../api/orders.js";
 import { getAllTables } from "../../api/tables.js";
+import UnifiedPaymentModal from "../../components/modal/UnifiedPaymentModal";
+import ReceiptModal from "../../components/modal/ReceiptModal";
 
 const categories = [
   {
@@ -66,15 +68,15 @@ const Cashier = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState("CASH");
-  const [showPayment, setShowPayment] = useState(false);
-  const [referenceNo, setReferenceNo] = useState("");
-  const [tenderedAmount, setTenderedAmount] = useState(0);
-  const [changeAmount, setChangeAmount] = useState(0);
+
+  const [customerType, setCustomerType] = useState("REGULAR");
   const [tables, setTables] = useState([]);
   const [selectedTableId, setSelectedTableId] = useState("");
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
   const [notification, setNotification] = useState(null);
+  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
 
   // Load data
   useEffect(() => {
@@ -117,15 +119,6 @@ const Cashier = () => {
     setFilteredProducts(filtered);
   }, [activeCategory, searchQuery, products]);
 
-  // Auto-calculate change for CASH
-  useEffect(() => {
-    if (showPayment && paymentMethod === "CASH") {
-      const total = getTotal();
-      const change = tenderedAmount - total;
-      setChangeAmount(change);
-    }
-  }, [tenderedAmount, cart, showPayment, paymentMethod]);
-
   const addToCart = (product) => {
     const existing = cart.find((item) => item.id === product.id);
     if (existing) {
@@ -159,29 +152,30 @@ const Cashier = () => {
     setCart(cart.filter((item) => item.id !== productId));
   };
 
-  const getTotal = () =>
-    cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const getCartBreakdown = () => {
+    let subtotal = 0;
+    let foodSubtotal = 0;
+    cart.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      subtotal += itemTotal;
+      const categoryName = item.category?.name?.toLowerCase() || '';
+      const isFood = ['appetizers', 'main-dishes'].includes(categoryName);
+      if (isFood) foodSubtotal += itemTotal;
+    });
+    const discount = (customerType === 'PWD' || customerType === 'SENIOR') ? foodSubtotal * 0.2 : 0;
+    const serviceCharge = foodSubtotal * 0.1;
+    const total = subtotal + serviceCharge - discount;
+    return { subtotal, discount, serviceCharge, total };
+  };
+
+  const getTotal = () => getCartBreakdown().total;
 
   const showNotification = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handlePayment = async () => {
-    if (cart.length === 0) return;
-
-    if (paymentMethod === "CASH") {
-      const total = getTotal();
-      if (tenderedAmount < total) {
-        showNotification(`Amount tendered (₱${tenderedAmount.toFixed(2)}) must be >= total (₱${total.toFixed(2)})`, "error");
-        return;
-      }
-    }
-
-    if (paymentMethod === "GCASH" && !referenceNo.trim()) {
-      showNotification("Reference number is required for GCASH payment.", "error");
-      return;
-    }
+  const handleUnifiedConfirm = async (total, paymentDetails) => {
     try {
       const items = cart.map((item) => ({
         productId: item.id,
@@ -189,26 +183,28 @@ const Cashier = () => {
         price: item.price,
       }));
 
-      // Create order directly in PREPARING status (bypassing PENDING)
-      await createOrder(
+      const response = await createOrder(
         items,
         selectedTableId,
-        "PREPARING", // Direct to preparing status
-        paymentMethod,
-        paymentMethod === "GCASH" ? referenceNo.trim() : null,
+        "PREPARING",
+        paymentDetails.paymentMethod,
+        null, // No GCash ref needed
+        paymentDetails.amountTendered,
+        customerType
       );
 
+      const orderId = response.data.id;
+
       showNotification(
-        `Payment completed! Order sent to kitchen. Total: ₱${getTotal().toFixed(2)} (${paymentMethod}${paymentMethod === "GCASH" ? ` - Ref: ${referenceNo}` : ""}) Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
+        `Payment completed! Order #${response.data.orderNumber || response.data.id}. Total: ₱${getTotal().toFixed(2)} (CASH) Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
         "success"
       );
       setCart([]);
       setSelectedTableId("");
-      setReferenceNo("");
-      setTenderedAmount(getTotal());
-      setChangeAmount(0);
-      setShowPayment(false);
-      loadData(); // Refresh stock
+      setShowUnifiedModal(false);
+      setSelectedOrderId(orderId);
+      setShowReceiptModal(true);
+      loadData();
     } catch (error) {
       showNotification("Order creation failed: " + error.message, "error");
     }
@@ -403,7 +399,7 @@ const Cashier = () => {
                       showNotification("Please select a table first", "error");
                       return;
                     }
-                    setShowPayment(true);
+                    setShowUnifiedModal(true);
                   }}
                   disabled={!selectedTableId || cart.length === 0}
                   className={`w-full py-3 px-6 rounded-xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
@@ -463,124 +459,27 @@ const Cashier = () => {
         )}
       </AnimatePresence>
 
-      {/* Payment Modal */}
-      {showPayment && (
-        <motion.div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={() => setShowPayment(false)}
-        >
-          <motion.div
-            className="bg-white rounded-2xl p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto"
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-2xl font-bold mb-6 flex items-center gap-2 justify-center">
-              <MdPayments /> Complete Sale
-            </h3>
-            <div className="space-y-4 mb-6">
-              <div>
-                Total:{" "}
-                <span className="font-bold text-2xl text-emerald-600">
-                  ₱{getTotal().toFixed(2)}
-                </span>
-              </div>
+      {/* Unified Payment Modal */}
+      <UnifiedPaymentModal
+        isOpen={showUnifiedModal}
+        onClose={() => setShowUnifiedModal(false)}
+        onConfirm={handleUnifiedConfirm}
+        totalAmount={getTotal()}
+        cartItems={cart}
+        customerType={customerType}
+        tableNumber={tables.find(t => t.id === selectedTableId)?.number}
+      />
 
-              <div className="flex gap-3">
-                <motion.button
-                  onClick={() => {
-                    setPaymentMethod("CASH");
-                    setTenderedAmount(getTotal());
-                  }}
-                  className={`flex-1 p-3 rounded-xl font-bold transition-all ${paymentMethod === "CASH" ? "bg-emerald-500 text-white shadow-lg" : "bg-gray-100 hover:bg-emerald-100"} flex items-center justify-center gap-2`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <MdAttachMoney /> Cash
-                </motion.button>
-                <motion.button
-                  onClick={() => {
-                    setPaymentMethod("GCASH");
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`flex-1 p-3 rounded-xl font-bold transition-all ${paymentMethod === "GCASH" ? "bg-green-500 text-white shadow-lg" : "bg-gray-100 hover:bg-green-100"} flex items-center justify-center gap-2`}
-                >
-                  <MdPhoneAndroid /> GCash
-                </motion.button>
-              </div>
-              {paymentMethod === "GCASH" && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                    <MdPayments className="text-green-500" /> Reference Number *
-                  </label>
-                  <input
-                    type="text"
-                    value={referenceNo}
-                    onChange={(e) => setReferenceNo(e.target.value)}
-                    placeholder="Enter GCash reference number"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                    required
-                  />
-                </div>
-              )}
-              {paymentMethod === "CASH" && (
-                <div className="mt-4 space-y-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                     Amount Tendered
-                  </label>
-                  <input
-                    type="text"
-                    value={tenderedAmount}
-                    onChange={(e) => setTenderedAmount(e.target.value)}
-                    placeholder="Enter tendered amount"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-lg font-bold"
-                  />
-                  {changeAmount >= 0 ? (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                      <span className="text-sm font-medium text-emerald-800">Change:</span>
-                      <div className="text-2xl font-bold text-emerald-600 mt-1">
-                        ₱{changeAmount.toFixed(2)}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-center">
-                      <span className="text-sm font-medium text-red-800">Insufficient Amount</span>
-                      <div className="text-lg font-bold text-red-600 mt-1">
-                        Need ₱{Math.abs(changeAmount).toFixed(2)} more
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3 pt-4">
-              <motion.button
-                onClick={() => {
-                  setTenderedAmount(getTotal());
-                  setChangeAmount(0);
-                  setShowPayment(false);
-                }}
-                className="flex-1 bg-gray-200 text-gray-800 py-3 px-6 rounded-xl font-bold hover:bg-gray-300 transition"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Cancel
-              </motion.button>
-              <motion.button
-                onClick={handlePayment}
-                className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 px-6 rounded-xl font-bold hover:from-emerald-600 hover:to-emerald-700 shadow-lg transition flex items-center justify-center gap-2"
-                whileHover={{ scale: 1.02 }}
-              >
-                <MdPayments /> Complete
-              </motion.button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => {
+          setShowReceiptModal(false);
+          setSelectedOrderId("");
+        }}
+        orderId={selectedOrderId}
+      />
+
     </div>
   );
 };

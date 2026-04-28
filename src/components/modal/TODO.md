@@ -1,9 +1,10 @@
-# Task: Convert upcoming orders payment to dedicated tendered amount + change modal
+# Cashier UnifiedPayment + Receipt Implementation
 
-## Plan Steps:
-- [ ] Step 1: Create `./frontend/src/components/modal/TenderModal.jsx` - Simplified CASH-only modal with tendered input + change display.
-- [ ] Step 2: Update `./frontend/src/components/orders/Orders.jsx` - Replace PaymentMethodModal with TenderModal for pending/upcoming orders.
-- [ ] Step 3: Test functionality - Verify modal opens on Accept, tendered input + change works, order status updates.
-- [ ] Step 4: Run frontend dev server to demo.
+## Steps (Current Progress)
 
-**Current Progress:** Starting Step 1
+- [x] 1. Plan created and approved  
+- [ ] 2. Create this TODO.md  
+- [ ] 3. Update UnifiedPaymentModal.jsx: Remove GCash, CASH-only  
+- [ ] 4. Update Cashier.jsx: Add ReceiptModal state/logic  
+- [ ] 5. Test full flow  
+- [ ] 6. Mark complete
