@@ -141,13 +141,13 @@ const fetchSaleDetail = async (saleId) => {
     setIsManualRefreshing(true);
     setShowRefreshSuccess(false);
     try {
-      await fetchSales();
+      await fetchAllSales();
       setShowRefreshSuccess(true);
       setTimeout(() => setShowRefreshSuccess(false), 900);
     } finally {
       setIsManualRefreshing(false);
     }
-  }, [fetchSales]);
+  }, [fetchAllSales]);
 
   // Set default to today
   useEffect(() => {
@@ -222,7 +222,7 @@ useEffect(() => {
 }, [rawSales, allSales]);
 
   const filteredSalesMemo = useMemo(() => {
-    let tempSales = [...rawSales];
+    let tempSales = [...allSales];
     if (filters.dateFrom || filters.dateTo) {
       const fromDate = toPhBoundaryUtc(filters.dateFrom, false);
       const toDate = toPhBoundaryUtc(filters.dateTo, true);
@@ -250,7 +250,7 @@ useEffect(() => {
       return filters.sortOrder === "asc" ? aVal - bVal : bVal - aVal;
     });
     return tempSales;
-  }, [rawSales, filters]);
+  }, [allSales, filters]);
 
   useEffect(() => {
     setFilteredSales(filteredSalesMemo);
