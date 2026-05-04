@@ -17,11 +17,19 @@ const PaymentMethodModal = ({
   const [amountTendered, setAmountTendered] = useState("");
 
   const handleConfirm = async () => {
-    // Validate GCASH reference number (only required for staff mode)
-    if (paymentMethod === "GCASH" && mode === "staff" && !referenceNo.trim()) {
-      alert("Please enter the GCASH reference number");
-      return;
+    // Validate GCASH reference number (5 digits exactly)
+    if (paymentMethod === "GCASH") {
+      const ref = referenceNo.trim();
+      if (!ref) {
+        alert("GCash reference number is required");
+        return;
+      }
+      if (!/^\d{5}$/.test(ref)) {
+        alert("GCash reference must be exactly 5 digits");
+        return;
+      }
     }
+
 
     // Validate CASH amount tendered
     if (paymentMethod === "CASH") {

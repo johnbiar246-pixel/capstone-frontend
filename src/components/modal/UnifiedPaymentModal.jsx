@@ -1,103 +1,148 @@
-import React, { useState, useEffect } from "react";
-import { useCart } from "../../contexts/CartContext";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MdClose, MdPayments, MdAttachMoney, MdReceiptLong, MdInfo, MdPerson, MdAccessibility } from "react-icons/md";
-import { FaMoneyBillWave } from "react-icons/fa";
+import {
+  MdClose,
+  MdPayments,
+  MdAttachMoney,
+  MdReceiptLong,
+  MdInfo,
+  MdPerson,
+  MdAccessibility,
+  MdPayment
+} from "react-icons/md";
+import { FaMoneyBillWave, FaMobileAlt } from "react-icons/fa";
 
 const UnifiedPaymentModal = ({
   isOpen,
   onClose,
   onConfirm,
-  totalAmount: rawTotal, 
-  cartItems = [], 
-  orderItems = [], 
+  cartItems = [],
+  orderItems = [],
   orderId = null,
-  mode = "customer-new", 
+  mode = "customer-new",
   customerType: initialCustomerType = "REGULAR",
   tableNumber = null,
   autoFill = true
 }) => {
-const [amountTendered, setAmountTendered] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("CASH");
+  const [referenceNo, setReferenceNo] = useState("");
+  const [amountTendered, setAmountTendered] = useState("");
   const [customerType, setCustomerType] = useState(initialCustomerType);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [changeAmount, setChangeAmount] = useState(0);
-const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCharge: 0, total: 0 });
-  const [total, setTotal] = useState(0);
 
-  const { calculateCartBreakdown } = useCart();
+  // LOCAL BREAKDOWN CALCULATION (independent of context state)
+  const calculateLocalBreakdown = useCallback((items, custType) => {
+    let subtotal = 0;
+    let foodSubtotal = 0;
 
-  useEffect(() => {
-    let subtotal, discountAmount, serviceChargeAmount, totalAmount;
-    
-    // Determine items to use for calculation
-    const itemsToUse = cartItems.length > 0 ? cartItems : orderItems;
-    
-    if (itemsToUse.length > 0) {
-      // Use CartContext breakdown logic for both customer-new and staff-accept
-      const breakdown = calculateCartBreakdown(itemsToUse, customerType);
-      subtotal = breakdown.subtotal;
-      discountAmount = breakdown.discount;
-      serviceChargeAmount = breakdown.serviceCharge;
-      totalAmount = breakdown.total;
-    } else if (rawTotal > 0) {
-      // Fallback for rawTotal without items
-      subtotal = rawTotal;
-      discountAmount = customerType !== 'REGULAR' ? rawTotal * 0.2 : 0;
-      const applicable = subtotal - discountAmount;
-      serviceChargeAmount = applicable * 0.1;
-      totalAmount = applicable + serviceChargeAmount;
-    } else {
-      subtotal = 0;
-      discountAmount = 0;
-      serviceChargeAmount = 0;
-      totalAmount = 0;
-    }
+    items.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      subtotal += itemTotal;
+      // cartItems have category on the item directly; orderItems have it under item.product.category
+      const catName = (
+        item.category?.name ||
+        item.product?.category?.name ||
+        item.product?.categoryId ||
+        item.categoryId ||
+        ''
+      ).toLowerCase().replace(/\s+/g, '-');
+      const isFood = ['appetizers', 'main-dishes'].includes(catName);
+      if (isFood) {
+        foodSubtotal += itemTotal;
+      }
+    });
 
-    const newBreakdown = {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      discount: parseFloat(discountAmount.toFixed(2)),
-      serviceCharge: parseFloat(serviceChargeAmount.toFixed(2)),
-      total: parseFloat(totalAmount.toFixed(2))
+    const discountAmount = (custType === 'PWD' || custType === 'SENIOR') ? foodSubtotal * 0.2 : 0;
+    const applicableAmount = subtotal - discountAmount;
+    const serviceCharge = applicableAmount * 0.1;
+    const total = applicableAmount + serviceCharge;
+
+    return { 
+      subtotal: parseFloat(subtotal.toFixed(2)), 
+      foodSubtotal: parseFloat(foodSubtotal.toFixed(2)),
+      discount: parseFloat(discountAmount.toFixed(2)), 
+      serviceCharge: parseFloat(serviceCharge.toFixed(2)),
+      total: parseFloat(total.toFixed(2))
     };
-    
-    setBreakdown(newBreakdown);
-    setTotal(newBreakdown.total);
-    if (newBreakdown.total > 0 && autoFill && amountTendered === "") {
-      setAmountTendered(newBreakdown.total.toFixed(2));
-    }
-  }, [cartItems, orderItems, customerType, rawTotal, calculateCartBreakdown, autoFill, amountTendered]);
+  }, []);
 
+  // SAFE BREAKDOWN
+  const breakdown = useMemo(() => {
+    const itemsToUse = cartItems.length > 0 ? cartItems : orderItems;
+    console.log("Cart Items:", cartItems);
+    console.log("Order Items:", orderItems);
+    console.log("Calculating breakdown with items:", itemsToUse, "and customerType:", customerType);
+
+    if (itemsToUse.length > 0) {
+      return calculateLocalBreakdown(itemsToUse, customerType);
+    }
+
+    return { subtotal: 0, discount: 0, serviceCharge: 0, total: 0 };
+  }, [cartItems, orderItems, customerType, calculateLocalBreakdown]);
+
+  const total = breakdown.total;
+
+  // Reset amount tendered when customer type changes so auto-fill re-triggers
   useEffect(() => {
+    if (autoFill) {
+      setAmountTendered("");
+    }
+  }, [customerType]);
+
+  // Auto-fill amount for CASH
+  useEffect(() => {
+    if (autoFill && paymentMethod === "CASH" && total > 0 && amountTendered === "") {
+      setAmountTendered(total.toFixed(2));
+    }
+  }, [total, autoFill, paymentMethod, amountTendered]);
+
+  // CHANGE CALC
+  const changeAmount = useMemo(() => {
     const tendered = parseFloat(amountTendered) || 0;
-    setChangeAmount(tendered - total);
+    return tendered - total;
   }, [amountTendered, total]);
 
+  // GCASH VALIDATION
+  const isValidGcashRef = (ref) => /^\d{5}$/.test(ref.trim());
+
   const handleConfirm = async () => {
-    const tendered = parseFloat(amountTendered) || 0;
-    
-    if (tendered < total) {
-      alert(`Amount tendered (₱${tendered.toFixed(2)}) must be >= total (₱${total.toFixed(2)})`);
-      return;
+    let paymentDetails = {
+      customerType,
+      breakdown
+    };
+
+    if (paymentMethod === "GCASH") {
+      const ref = referenceNo.trim();
+      if (mode.startsWith("staff") && (!ref || !isValidGcashRef(ref))) {
+        alert("GCash reference must be exactly 5 digits");
+        return;
+      }
+      paymentDetails.referenceNo = ref;
+      paymentDetails.paymentMethod = "GCASH";
+    } else { // CASH
+      const tendered = parseFloat(amountTendered) || 0;
+      if (tendered < total) {
+        alert(`Cash tendered (₱${tendered.toFixed(2)}) must be >= total (₱${total.toFixed(2)})`);
+        return;
+      }
+      paymentDetails.amountTendered = tendered;
+      paymentDetails.paymentMethod = "CASH";
     }
+
+    paymentDetails.orderId = orderId;
+    paymentDetails.tableNumber = tableNumber;
+    paymentDetails.mode = mode;
 
     setIsProcessing(true);
     try {
-      const paymentDetails = {
-        paymentMethod: "CASH",
-        amountTendered: tendered,
-        customerType,
-        breakdown,  // Full breakdown for order submission
-        orderId,
-        tableNumber,
-        mode
-      };
       await onConfirm(total, paymentDetails);
-    } catch (error) {
+    } catch {
       alert("Payment failed. Please try again.");
     } finally {
       setIsProcessing(false);
     }
   };
+
 
   const handleClose = () => {
     if (!isProcessing) onClose();
@@ -105,8 +150,8 @@ const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCh
 
   const getTitle = () => {
     const titles = {
-      "customer-new": "Confirm Your Order", 
-      "staff-new": "Complete New Order",
+      "customer-new": "Confirm Your Order",
+      "staff-new": "Process Payment",
       "staff-accept": `Accept Payment - Order #${orderId}`
     };
     return titles[mode] || "Process Payment";
@@ -114,8 +159,8 @@ const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCh
 
   const customerTypes = [
     { value: "REGULAR", label: "Regular", icon: MdPerson },
-    { value: "PWD", label: "PWD (20% food discount)", icon: MdAccessibility },
-    { value: "SENIOR", label: "Senior (20% food discount)", icon: MdAccessibility }
+    { value: "PWD", label: "PWD (20% food)", icon: MdAccessibility },
+    { value: "SENIOR", label: "Senior (20% food)", icon: MdAccessibility }
   ];
 
   if (!isOpen) return null;
@@ -124,182 +169,212 @@ const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCh
     <>
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={handleClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div 
-          className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[95vh] overflow-y-auto" 
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Header */}
+        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          {/* HEADER */}
           <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-6 text-white relative rounded-t-2xl">
-            <button
-              onClick={handleClose}
-              disabled={isProcessing}
-              className="absolute top-4 right-4 text-white/80 hover:text-white p-1 rounded-full hover:bg-white/20 transition-all"
-            >
+            <button onClick={handleClose} disabled={isProcessing} className="absolute top-4 right-4 text-white/80 hover:text-white">
               <MdClose className="text-2xl" />
             </button>
             <div className="text-center">
-              <MdPayments className="text-5xl mx-auto mb-4 opacity-90" />
-              <h2 className="text-2xl font-bold mb-2">{getTitle()}</h2>
+              <MdPayments className="text-5xl mx-auto mb-4" />
+              <h2 className="text-2xl font-bold">{getTitle()}</h2>
               {orderId && tableNumber && (
-                <p className="text-white/90 text-sm bg-white/10 px-3 py-1 rounded-full">
+                <p className="text-sm mt-2 bg-white/10 px-3 py-1 rounded-full inline-block">
                   Order #{orderId} • Table {tableNumber}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Content */}
+          {/* CONTENT */}
           <div className="p-6 space-y-6">
-            {/* Breakdown */}
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
-              <h3 className="font-bold text-xl mb-4 flex items-center gap-2 text-gray-800">
+            {/* BREAKDOWN */}
+            <div className="bg-gray-50 p-6 rounded-2xl border">
+              <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
                 <MdReceiptLong /> Order Breakdown
               </h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-1">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span className="font-semibold">₱{breakdown.subtotal.toFixed(2)}</span>
+                  <span>₱{breakdown.subtotal.toFixed(2)}</span>
                 </div>
                 {breakdown.discount > 0 && (
-                  <div className="flex justify-between py-1 text-green-600 font-semibold bg-green-50 px-3 rounded-lg">
-                    <span>Discount (20% food)</span>
+                  <div className="flex justify-between text-green-600 font-semibold">
+                    <span>Discount</span>
                     <span>-₱{breakdown.discount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-1 text-emerald-600 font-semibold bg-emerald-50 px-3 rounded-lg">
-                  <span>Service Charge (10% after discount)</span>
+                <div className="flex justify-between text-emerald-600 font-semibold">
+                  <span>Service Charge</span>
                   <span>+₱{breakdown.serviceCharge.toFixed(2)}</span>
                 </div>
-                <div className="border-t pt-4 mt-3">
-                  <div className="flex justify-between items-end pb-2">
-                    <span className="text-2xl font-black text-gray-900">TOTAL</span>
-                  <span className="text-3xl font-black text-emerald-600">
-                      ₱{total.toFixed(2)}
-                    </span>
-                  </div>
+                <div className="border-t pt-3 flex justify-between text-xl font-black">
+                  <span>TOTAL</span>
+                  <span className="text-emerald-600">₱{total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Customer Type */}
-            {(mode === "customer-new" || mode === "staff-new") && (
-              <div className="bg-blue-50 p-5 rounded-xl border-2 border-blue-200">
-                <label className="block text-sm font-bold text-blue-800 mb-4 flex items-center gap-2">
-                  <MdPerson className="text-xl" /> Customer Type
+            {/* CUSTOMER TYPE (Radio - exclusive) */}
+            {(mode === "customer-new" || mode === "staff-new" || mode === "staff-accept") && (
+              <div>
+                <label className="block text-sm font-bold mb-3 flex items-center gap-2 text-gray-700">
+                  Customer Type
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   {customerTypes.map((type) => (
-                    <button
+                    <motion.button
                       key={type.value}
+                      type="button"
                       onClick={() => setCustomerType(type.value)}
-                      className={`p-4 rounded-xl border-3 transition-all flex flex-col items-center gap-2 text-sm font-medium shadow-sm hover:shadow-md h-24 ${
+                      className={`p-4 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
                         customerType === type.value
-                          ? "border-blue-500 bg-blue-100 text-blue-800 shadow-blue-200"
-                          : "border-blue-200 bg-white text-blue-700 hover:border-blue-400"
+                          ? "bg-emerald-100 border-emerald-500 shadow-md"
+                          : "border-gray-200 hover:border-emerald-300 hover:shadow-sm"
                       }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
                       <type.icon className="text-2xl" />
-                      <span className="font-semibold">{type.label}</span>
-                    </button>
+                      <div className="text-xs font-medium text-center">{type.label}</div>
+                    </motion.button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* CASH Only */}
-            <div className="text-center py-8 bg-gradient-to-b from-emerald-50 to-white rounded-2xl border-2 border-emerald-200">
-              <FaMoneyBillWave className="text-6xl text-emerald-500 mx-auto mb-4 animate-bounce" />
-              <div className="text-2xl font-black text-emerald-700 mb-1">CASH PAYMENT</div>
-              <div className="text-emerald-600 font-semibold">Only cash accepted</div>
-            </div>
-
-            {/* Tendered Input */}
-            <div className="space-y-4">
-              <label className="flex items-center gap-3 text-xl font-bold text-gray-800">
-                <MdAttachMoney className="text-3xl text-emerald-600" />
-                Amount Tendered
+            {/* PAYMENT METHOD SELECTION */}
+            <div>
+              <label className="flex items-center gap-2 font-bold mb-4 text-gray-700">
+                <MdPayment className="text-emerald-600" /> Payment Method
               </label>
-              <div className="relative">
-                  <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.01"
-                  min={total}
-                  value={amountTendered}
-                  onChange={(e) => setAmountTendered(e.target.value)}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {/* CASH */}
+                <motion.button
+                  onClick={() => setPaymentMethod("CASH")}
                   disabled={isProcessing}
-                  placeholder={`Minimum: ₱${total.toFixed(2)}`}
-                  className="w-full px-6 py-5 rounded-2xl border-4 border-emerald-200 focus:border-emerald-400 focus:outline-none transition-all text-2xl font-bold text-right bg-emerald-50 shadow-lg hover:shadow-xl"
-                />
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                    paymentMethod === "CASH"
+                      ? "border-green-500 bg-green-50 shadow-lg"
+                      : "border-gray-200 hover:border-green-400 hover:shadow-md"
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FaMoneyBillWave className={`text-3xl ${paymentMethod === "CASH" ? "text-green-600" : "text-gray-400"}`} />
+                  <div>
+                    <div className={`font-bold ${paymentMethod === "CASH" ? "text-green-700" : "text-gray-700"}`}>Cash</div>
+                    <div className="text-xs text-gray-500">Amount tendered</div>
+                  </div>
+                </motion.button>
 
+                {/* GCASH */}
+                <motion.button
+                  onClick={() => setPaymentMethod("GCASH")}
+                  disabled={isProcessing}
+                  className={`p-6 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${
+                    paymentMethod === "GCASH"
+                      ? "border-blue-500 bg-blue-50 shadow-lg"
+                      : "border-gray-200 hover:border-blue-400 hover:shadow-md"
+                  }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FaMobileAlt className={`text-3xl ${paymentMethod === "GCASH" ? "text-blue-600" : "text-gray-400"}`} />
+                  <div>
+                    <div className={`font-bold ${paymentMethod === "GCASH" ? "text-blue-700" : "text-gray-700"}`}>GCash</div>
+                    <div className="text-xs text-gray-500">5-digit reference</div>
+                  </div>
+                </motion.button>
               </div>
-            </div>
 
-            {/* Change Display */}
-            <div className={`p-6 rounded-2xl text-center border-4 shadow-xl transition-all ${
-              changeAmount >= 0 
-                ? 'border-emerald-400 bg-emerald-50' 
-                : 'border-red-400 bg-red-50'
-            }`}>
-              <span className={`text-xl font-bold block mb-2 ${
-                changeAmount >= 0 ? 'text-emerald-800' : 'text-red-800'
-              }`}>
-                {changeAmount >= 0 ? 'Change Due:' : 'Short by:'}
-              </span>
-              <div className={`text-4xl font-black mb-3 ${
-                changeAmount >= 0 ? 'text-emerald-600' : 'text-red-600'
-              }`}>
-                ₱{Math.abs(changeAmount).toFixed(2)}
-              </div>
-              {changeAmount < 0 && (
-                <p className="text-sm font-medium text-red-700 bg-red-100 px-3 py-1 rounded-full inline-block">
-                  Enter higher amount to continue
-                </p>
-              )}
+              {/* CONDITIONAL INPUTS */}
+              <AnimatePresence mode="wait">
+                {paymentMethod === "GCASH" && (
+                  <motion.div
+                    key="gcash"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-3"
+                  >
+                    <label className="block text-sm font-medium text-gray-700">
+                      GCash Reference (last 5 digits)
+                      {mode.startsWith("staff") && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    <input
+                      type="text"
+                      value={referenceNo}
+                      onChange={(e) => setReferenceNo(e.target.value.replace(/[^0-9]/g, ''))}
+                      maxLength={5}
+                      placeholder="12345"
+                      className="w-full p-4 border-2 rounded-xl text-xl font-mono tracking-wider text-center focus:border-blue-500 focus:outline-none"
+                      disabled={isProcessing}
+                    />
+                    {mode.startsWith("staff") && referenceNo && !isValidGcashRef(referenceNo) && (
+                      <p className="text-sm text-red-600">Must be exactly 5 digits</p>
+                    )}
+                  </motion.div>
+                )}
+
+                {paymentMethod === "CASH" && (
+                  <motion.div
+                    key="cash"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-3"
+                  >
+                    <label className="flex items-center gap-2 font-bold text-gray-700">
+                      ₱ Amount Given
+                    </label>
+                    <input
+  type="number"
+  min={total}
+  value={amountTendered}
+  onChange={(e) => setAmountTendered(e.target.value)}
+  onWheel={(e) => e.target.blur()} // disables scroll changing value
+  className="w-full p-5 border-2 rounded-xl text-right text-2xl font-bold focus:border-emerald-500 focus:outline-none"
+  placeholder={`Min ₱${total.toFixed(2)}`}
+  disabled={isProcessing}
+/>
+                    {/* CHANGE DISPLAY */}
+                    <div className={`p-6 rounded-2xl text-center border-4 transition-all ${
+                      changeAmount >= 0 ? 'border-emerald-300 bg-emerald Ascent 50 shadow-lg' : 'border-red-300 bg-red-50 shadow-lg'
+                    }`}>
+                      <span className={`font-bold text-lg ${
+                        changeAmount >= 0 ? 'text-emerald-800' : 'text-red-800'
+                      }`}>
+                        {changeAmount >= 0 ? 'Change Due' : 'Shortfall'}
+                      </span>
+                      <div className={`text-3xl font-black mt-2 ${
+                        changeAmount >= 0 ? 'text-emerald-600' : 'text-red-600'
+                      }`}>
+                        ₱{Math.abs(changeAmount).toFixed(2)}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
-          {/* Buttons */}
-          <div className="p-6 pt-0 space-y-3 bg-gray-50 rounded-b-2xl">
-            <motion.button
+          {/* BUTTONS */}
+          <div className="p-6 space-y-3">
+            <button
               onClick={handleConfirm}
-              disabled={isProcessing || changeAmount < 0}
-              className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 text-white py-5 px-8 rounded-2xl font-black text-xl shadow-xl hover:shadow-2xl hover:from-emerald-700 hover:to-emerald-800 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
-              whileHover={changeAmount >= 0 && !isProcessing ? { scale: 1.02 } : {}}
-              whileTap={changeAmount >= 0 && !isProcessing ? { scale: 0.98 } : {}}
+              disabled={isProcessing || (paymentMethod === "CASH" && changeAmount < 0) || (paymentMethod === "GCASH" && mode.startsWith("staff") && !isValidGcashRef(referenceNo))}
+              className="w-full bg-gradient-to-r from-emerald-600 to-emerald Ascent 700 text-white p-4 rounded-xl font-bold text-lg shadow-xl hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isProcessing ? (
-                <>
-                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <MdPayments className="text-2xl" />
-                  {mode === "staff-accept" ? "Accept & Complete" : "Pay Now"}
-                </>
-              )}
-            </motion.button>
-            
-            <motion.button
+              {isProcessing ? "Processing..." : `Pay ₱${total.toFixed(2)} (${paymentMethod})`}
+            </button>
+            <button
               onClick={handleClose}
+              className="w-full py-3 px-6 border border-red-300 bg-red-50 text-red-700 font-semibold rounded-xl hover:bg-red-100 hover:border-red-400 hover:text-red-800 transition-all shadow-sm hover:shadow-md"
               disabled={isProcessing}
-              className="w-full border-2 border-gray-300 text-gray-700 py-4 px-8 rounded-2xl font-bold text-lg hover:bg-gray-100 hover:border-gray-400 active:scale-95 transition-all disabled:opacity-50"
-              whileHover={!isProcessing ? { scale: 1.02 } : {}}
-              whileTap={!isProcessing ? { scale: 0.98 } : {}}
             >
               Cancel
-            </motion.button>
-          </div>
-
-          {/* Info */}
-          <div className="p-4 bg-blue-50 border-t border-blue-200 rounded-b-2xl">
-            <div className="flex items-start gap-3 text-sm text-blue-800">
-              <MdInfo className="text-lg flex-shrink-0 mt-0.5" />
-              <div>
-                <p><strong>Next:</strong> Order will be marked PREPARING and receipt generated automatically</p>
-              </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -308,4 +383,3 @@ const [breakdown, setBreakdown] = useState({ subtotal: 0, discount: 0, serviceCh
 };
 
 export default UnifiedPaymentModal;
-
