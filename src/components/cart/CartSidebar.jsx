@@ -34,6 +34,7 @@ const CartSidebar = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tableNumber = searchParams.get("table");
@@ -86,8 +87,7 @@ const CartSidebar = () => {
       if (response.success) {
         setShowConfirmation(false);
         clearCart();
-        closeCart();
-        navigate("/user/orders?tab=upcoming");
+        setShowSuccess(true);
       } else {
         showNotification(response.message || "Order failed", "error");
       }
@@ -153,7 +153,7 @@ const CartSidebar = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-[#F4B860]">
-                    {showConfirmation ? "Confirm Order" : "My Order"}
+                    {showSuccess ? "Order Confirmed" : showConfirmation ? "Confirm Order" : "My Order"}
                   </h2>
                   <p className="text-white/80 text-sm">
                     {getCartItemCount()} item{getCartItemCount() !== 1 ? "s" : ""}
@@ -161,14 +161,31 @@ const CartSidebar = () => {
                 </div>
               </div>
               <button
-                onClick={() => showConfirmation ? setShowConfirmation(false) : closeCart()}
+                onClick={() => showSuccess ? (setShowSuccess(false), closeCart()) : showConfirmation ? setShowConfirmation(false) : closeCart()}
                 className="text-white/70 hover:text-[#F4B860] p-2"
               >
                 <MdClose className="text-2xl" />
               </button>
             </div>
 
-            {showConfirmation ? (
+            {showSuccess ? (
+              /* SUCCESS VIEW */
+              <div className="flex flex-col flex-1 items-center justify-center p-8 text-center">
+                <div className="w-20 h-20 rounded-full bg-[#254F22] flex items-center justify-center mb-6">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-[#254F22] mb-2">Order Placed!</h3>
+                <p className="text-gray-500 mb-8">Your order has been sent to the kitchen. Payment will be collected at the counter.</p>
+                <button
+                  onClick={() => { setShowSuccess(false); closeCart(); }}
+                  className="w-full bg-[#254F22] text-white py-4 rounded-xl font-bold text-lg"
+                >
+                  Back to Menu
+                </button>
+              </div>
+            ) : showConfirmation ? (
               /* CONFIRMATION VIEW */
               <div className="flex flex-col flex-1 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -302,7 +319,7 @@ const CartSidebar = () => {
               </div>
             )}
               </> /* end cart view */
-            )} {/* end showConfirmation ternary */}
+            )} {/* end showSuccess / showConfirmation ternary */}
           </motion.div>
         </>
       )}

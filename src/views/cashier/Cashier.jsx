@@ -18,13 +18,10 @@ import {
 
 import { getProducts, getCategories } from "../../api/products.js";
 import { getAllTables } from "../../api/tables.js";
-import { getPendingOrders } from "../../api/orders.js";
 import { createSale } from "../../api/sales.js";
 import UnifiedPaymentModal from "../../components/modal/UnifiedPaymentModal";
 import ReceiptModal from "../../components/modal/ReceiptModal";
 import { useNavigate } from "react-router-dom";
-import { MdAccessTime } from "react-icons/md";
-import io from 'socket.io-client';
 
 
 const categories = [
@@ -83,52 +80,11 @@ const Cashier = () => {
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState("");
-  const [pendingOrders, setPendingOrders] = useState([]);
-  const [pendingOrdersLoading, setPendingOrdersLoading] = useState(false);
 
-  // Load data + Socket.io
+  // Load data
   useEffect(() => {
     loadData();
-    
-    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001');
-    
-    socket.on('ordersUpdate', () => {
-      console.log('Real-time orders update - refetching pending');
-      fetchPendingOrders();
-    });
-
-    // Initial + poll fallback
-    fetchPendingOrders();
-    const interval = setInterval(fetchPendingOrders, 10000);
-
-    return () => {
-      socket.disconnect();
-      clearInterval(interval);
-    };
   }, []);
-
-  const fetchPendingOrders = async () => {
-    setPendingOrdersLoading(true);
-    try {
-      const response = await getPendingOrders();
-      if (response.data && response.data.success) {
-        const transformedOrders = response.data.data.map(order => ({
-          id: order.id.toString(),
-          orderNumber: order.orderNumber,
-          details: order.orderItems.map(item => `${item.quantity}x ${item.product?.name || "Item"}`).join(", "),
-          totalAmount: Number(order.totalAmount ?? 0),
-          status: order.status?.toLowerCase() || "preparing",
-          time: new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          tableNumber: order.table?.number || "N/A",
-        }));
-        setPendingOrders(transformedOrders);
-      }
-    } catch (error) {
-      console.error("Error fetching pending orders:", error);
-    } finally {
-      setPendingOrdersLoading(false);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -217,62 +173,6 @@ const handleUnifiedConfirm = async (total, paymentDetails) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      {/* Upcoming Orders Section */}
-      {pendingOrders.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-7xl mx-auto mb-8"
-        >
-          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-6 rounded-2xl shadow-2xl">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
-              <MdAccessTime className="w-8 h-8" />
-              Upcoming Orders ({pendingOrders.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-              {pendingOrders.map((order) => (
-                <motion.div
-                  key={order.id}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/50"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-bold text-lg text-gray-900">
-                        #{order.orderNumber || order.id.slice(-4)}
-                      </p>
-                      <p className="text-sm text-gray-600">{order.time}</p>
-                      <span className="inline-block mt-1 px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded-full">
-                        Table #{order.tableNumber}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-gray-700 mb-3 text-sm line-clamp-2">{order.details}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-xl text-gray-900">
-                      ₱{order.totalAmount.toFixed(2)}
-                    </span>
-                    <motion.button
-                      onClick={() => navigate(`/user/orders?table=${order.tableNumber}`)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all"
-                    >
-                      Accept
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            {pendingOrdersLoading && (
-              <div className="text-center py-4 text-white/80">
-                Loading upcoming orders...
-              </div>
-            )}
-          </div>
-        </motion.div>
-      )}
-
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
         {/* Middle: Categories + Products */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 overflow-hidden flex flex-col">
