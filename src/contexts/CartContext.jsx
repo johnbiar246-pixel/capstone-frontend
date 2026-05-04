@@ -225,7 +225,14 @@ export const CartProvider = ({ children }) => {
     if (response.success) {
       clearCart();
       closeCart();
-      return { success: true, data: { orderNumber: response.data.orderNumber } };
+      return {
+        success: true,
+        data: {
+          orderNumber: response.data.order?.orderNumber,
+          orderId: response.data.order?.id,
+          order: response.data.order,
+        },
+      };
     }
 
     return response;

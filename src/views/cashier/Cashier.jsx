@@ -177,7 +177,6 @@ const Cashier = () => {
 
 const handleUnifiedConfirm = async (total, paymentDetails) => {
       try {
-
         const response = await placeOrder(
           selectedTableId,
           paymentDetails.paymentMethod,
@@ -188,17 +187,21 @@ const handleUnifiedConfirm = async (total, paymentDetails) => {
           "cashier"  // Cashier mode for staff ordering
         );
 
-        showNotification(
-          `Payment completed! Order #${response.order?.orderNumber || response.order?.id || 'N/A'}`,
-          "success"
-        );
-
         clearCart();
         setSelectedTableId("");
         setShowUnifiedModal(false);
 
-
-
+        // Show receipt after successful payment
+        const orderId = response?.data?.orderId || response?.data?.order?.id;
+        if (orderId) {
+          setSelectedOrderId(orderId);
+          setShowReceiptModal(true);
+        } else {
+          showNotification(
+            `Payment completed! Order #${response?.data?.orderNumber || "N/A"}`,
+            "success"
+          );
+        }
       } catch (error) {
         showNotification("Order creation failed: " + (error.response?.data?.message || error.message), "error");
       }
