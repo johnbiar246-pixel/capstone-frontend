@@ -8,33 +8,46 @@ const ReceiptModal = ({
   isOpen,
   onClose,
   orderId,
-  onPrint,
 }) => {
   const [receiptData, setReceiptData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  console.log(receiptData)
+  const fetchReceipt = React.useCallback(async () => {
+    if (!orderId) {
+      setError('Missing order ID for receipt');
+      setReceiptData(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      const response = await getReceipt(orderId);
+      if (response?.success && response?.data) {
+        setReceiptData(response.data);
+      } else {
+        setError(response?.message || 'Failed to load receipt');
+        setReceiptData(null);
+      }
+    } catch (err) {
+      console.error('Receipt load error:', err);
+      setError(
+        err?.response?.data?.message || err?.message || 'Failed to load receipt'
+      );
+      setReceiptData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
   useEffect(() => {
     if (isOpen && orderId) {
       fetchReceipt();
     }
-  }, [isOpen, orderId]);
-
-  const fetchReceipt = async () => {
-    try {
-      setLoading(true);
-      const response = await getReceipt(orderId);
-      if (response.success) {
-        setReceiptData(response.data);
-      } else {
-        setError('Failed to load receipt');
-      }
-    } catch (err) {
-      setError('Failed to load receipt');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isOpen, orderId, fetchReceipt]);
 
   const generatePDF = () => {
     if (!receiptData) return;
@@ -66,7 +79,7 @@ doc.text(`Order #${receiptData.orderNumber || receiptData.orderId}`, 20, y);
     doc.text('Items:', 20, y);
     y += 10;
     doc.setFontSize(10);
-    receiptData.items.forEach((item, index) => {
+    receiptData.items.forEach((item) => {
       doc.text(`${item.quantity}x ${item.name}`, 25, y);
       doc.text(`  ₱${item.total.toFixed(2)}`, 150, y);
       y += 7;
@@ -143,20 +156,14 @@ doc.save(`receipt-${receiptData?.orderNumber || receiptData?.orderId || orderId}
   return (
     <AnimatePresence>
       <>
-        <motion.div
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
           onClick={onClose}
         />
-        <motion.div
+        <div
           className="fixed inset-0 z-[60] flex items-center justify-center p-4 max-w-4xl w-full"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
         >
-          <motion.div
+          <div
             className="bg-white rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto w-full max-w-2xl border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
@@ -267,30 +274,27 @@ doc.save(`receipt-${receiptData?.orderNumber || receiptData?.orderId || orderId}
 
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-4 bg-gray-50 rounded-b-3xl px-4 pb-4">
-                    <motion.button
+                    <button
                       onClick={downloadPDF}
                       className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-4 px-6 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                     >
                       <MdDownload className="text-xl" />
                       Download PDF
-                    </motion.button>
-                    <motion.button
+                    </button>
+                    <button
                       onClick={printPDF}
                       className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
                     >
                       <MdPrint className="text-xl" />
                       Print Receipt
-                    </motion.button>
+                    </button>
                   </div>
                 </>
               ) : null}
             </div>
-          </motion.div>
-        </motion.div>
+
+          </div>
+        </div>
       </>
     </AnimatePresence>
   );

@@ -7,6 +7,7 @@ import {
   MdExpandLess,
   MdLocalOffer,
   MdCheck,
+  MdClose,
 } from "react-icons/md";
 import {
   LineChart,
@@ -17,7 +18,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { getSales } from "../../api/sales.js";
+import { useSales } from "../../contexts/SalesContext.jsx";
+import SaleDetailModal from "../modal/SaleDetailModal.jsx";
 import { useMemo } from "react";
 import { MdClear, MdCalendarToday, MdSort, MdPayments } from "react-icons/md";
 
@@ -46,7 +48,7 @@ const toPhBoundaryUtc = (dateStr, isEnd = false) => {
 const toPhDayKey = (dateValue) => {
   const d = new Date(dateValue);
   const shifted = new Date(d.getTime() + PH_OFFSET_MS);
-  return shifted.toISOString().slice(0, 10); // YYYY-MM-DD in PH day
+  return shifted.toISOString().slice(0, 10);
 };
 
 const History = () => {
@@ -61,12 +63,10 @@ const History = () => {
     paymentFilter: "all",
   });
   const [breakdownFilters, setBreakdownFilters] = useState({
-    scope: "all", // all | month
-    year: 2026,
-    month: 1, // 1-12
+    scope: "all",
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
   });
-
-  // State for expanded sale rows and today's sales
   const [expandedSales, setExpandedSales] = useState({});
   const [todaySales, setTodaySales] = useState([]);
   const [todayProductSummary, setTodayProductSummary] = useState([]);
@@ -75,53 +75,67 @@ const History = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [showRefreshSuccess, setShowRefreshSuccess] = useState(false);
+  // Modal state
+  const [selectedSale, setSelectedSale] = useState(null);
+  const [selectedSaleId, setSelectedSaleId] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const { fetchSales: loadSales, fetchSaleDetail: loadSaleDetail } = useSales();
 
   const isValidDates =
     !filters.dateFrom ||
     !filters.dateTo ||
     new Date(filters.dateFrom) <= new Date(filters.dateTo);
 
+const fetchSaleDetail = async (saleId) => {
+  setModalLoading(true);
+  try {
+    const sale = await loadSaleDetail(saleId);
+    setSelectedSale(sale);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setModalLoading(false);
+  }
+};
+
+  const openSaleDetail = (saleId) => {
+    setSelectedSaleId(saleId);
+    fetchSaleDetail(saleId);
+  };
+
+  const closeSaleDetail = () => {
+    setSelectedSaleId(null);
+    setSelectedSale(null);
+  };
+
   const fetchSales = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-
     try {
-      // Ensure we're sending the correct date format to the API
-      const params = {};
+      const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+      const params = { ...(userId && { userId }) };
       if (filters.dateFrom) params.dateFrom = filters.dateFrom;
       if (filters.dateTo) params.dateTo = filters.dateTo;
 
-      console.log("Fetching sales with params:", params);
-      const res = await getSales(params);
-
-      console.log("SALES RESPONSE:", res.data);
-
-      if (res.data?.success) {
-        setRawSales(res.data.data);
-      } else {
-        throw new Error(res.data?.message || "Failed to fetch sales");
-      }
+      const sales = await loadSales(params);
+      setRawSales(Array.isArray(sales) ? sales : []);
     } catch (err) {
-      console.error("FETCH ERROR:", err);
-
-      setError(
-        err.response?.data?.message || err.message || "Failed to load sales",
-      );
+      setError(err.message || "Failed to load sales");
     } finally {
       setIsLoading(false);
     }
-  }, [filters.dateFrom, filters.dateTo]);
+  }, [filters.dateFrom, filters.dateTo, loadSales]);
 
   const fetchAllSales = useCallback(async () => {
     try {
-      const res = await getSales({});
-      if (res.data?.success) {
-        setAllSales(res.data.data);
-      }
+      const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+      const sales = await loadSales({ ...(userId && { userId }) });
+      setAllSales(Array.isArray(sales) ? sales : []);
     } catch (err) {
       console.error("FETCH ALL SALES ERROR:", err);
     }
-  }, []);
+  }, [loadSales]);
 
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefreshing(true);
@@ -137,9 +151,7 @@ const History = () => {
 
   // Set default to today
   useEffect(() => {
-    const today = Intl.DateTimeFormat("sv", { timeZone: PH_TZ }).format(
-      new Date(),
-    );
+    const today = Intl.DateTimeFormat("sv", { timeZone: PH_TZ }).format(new Date());
     setFilters((prev) => ({ ...prev, dateFrom: today, dateTo: today }));
   }, []);
 
@@ -151,74 +163,66 @@ const History = () => {
     }));
   };
 
-  // Initial fetch - run after setting default date to today
+  // Initial fetch
   useEffect(() => {
     if (filters.dateFrom && filters.dateTo) {
       fetchSales();
     }
-  }, [filters.dateFrom, filters.dateTo, fetchSales]); // Run when date filters change
+  }, [filters.dateFrom, filters.dateTo, fetchSales]);
 
-  // Fetch complete dataset for monthly breakdown
   useEffect(() => {
     fetchAllSales();
   }, [fetchAllSales]);
 
-  // Auto-refetch every 30s
   useEffect(() => {
     const intervalId = setInterval(fetchSales, 30000);
     return () => clearInterval(intervalId);
   }, [fetchSales]);
 
-  // Refetch on window focus
   useEffect(() => {
     const handleFocus = () => fetchSales();
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
   }, [fetchSales]);
 
-  // Update today's summary from raw sales (today-only widget)
-  useEffect(() => {
-    const todayKey = toPhDayKey(new Date());
-    const todaySalesData = [];
-    const productSummary = {};
+useEffect(() => {
+  const todayKey = toPhDayKey(new Date());
 
-    rawSales.forEach((sale) => {
-      // Today's sales - compare by PH day key
-      const saleDayKey = toPhDayKey(sale.createdAt);
-      if (saleDayKey === todayKey) {
-        todaySalesData.push(sale);
+  const source = allSales.length ? allSales : rawSales;
 
-        // Product summary for today
-        sale.saleItems?.forEach((item) => {
-          const productId = item.product.id;
-          if (!productSummary[productId]) {
-            productSummary[productId] = {
-              id: productId,
-              name: item.product.name,
-              quantity: 0,
-              totalSales: 0,
-            };
-          }
-          productSummary[productId].quantity += item.quantity;
-          productSummary[productId].totalSales += item.price * item.quantity;
-        });
-      }
-    });
+  const todaySalesData = [];
+  const productSummary = {};
 
-    setTodaySales(todaySalesData);
+  source.forEach((sale) => {
+    const saleDayKey = toPhDayKey(sale.createdAt);
 
-    // Convert product summary to array and sort by quantity
-    const productSummaryArray = Object.values(productSummary).sort(
-      (a, b) => b.quantity - a.quantity,
-    );
-    setTodayProductSummary(productSummaryArray);
-  }, [rawSales]);
+    if (saleDayKey === todayKey) {
+      todaySalesData.push(sale);
 
-  // Real-time client-side filters and sorting with date validation
+      sale.saleItems?.forEach((item) => {
+        const productId = item.product.id;
+
+        if (!productSummary[productId]) {
+          productSummary[productId] = {
+            id: productId,
+            name: item.product.name,
+            quantity: 0,
+            totalSales: 0,
+          };
+        }
+
+        productSummary[productId].quantity += item.quantity;
+        productSummary[productId].totalSales += item.price * item.quantity;
+      });
+    }
+  });
+
+  setTodaySales(todaySalesData);
+  setTodayProductSummary(Object.values(productSummary));
+}, [rawSales, allSales]);
+
   const filteredSalesMemo = useMemo(() => {
     let tempSales = [...rawSales];
-
-    // Date filter client-side backup
     if (filters.dateFrom || filters.dateTo) {
       const fromDate = toPhBoundaryUtc(filters.dateFrom, false);
       const toDate = toPhBoundaryUtc(filters.dateTo, true);
@@ -229,15 +233,11 @@ const History = () => {
         return true;
       });
     }
-
-    // Payment filter
     if (filters.paymentFilter !== "all") {
       tempSales = tempSales.filter(
         (sale) => sale.paymentMethod === filters.paymentFilter,
       );
     }
-
-    // Sorting
     tempSales.sort((a, b) => {
       let aVal, bVal;
       if (filters.sortBy === "date") {
@@ -249,7 +249,6 @@ const History = () => {
       }
       return filters.sortOrder === "asc" ? aVal - bVal : bVal - aVal;
     });
-
     return tempSales;
   }, [rawSales, filters]);
 
@@ -257,13 +256,10 @@ const History = () => {
     setFilteredSales(filteredSalesMemo);
   }, [filteredSalesMemo]);
 
-  // Build Monthly Breakdown from all sales using independent breakdown filters
   useEffect(() => {
     const monthly = {};
-
     const breakdownSource = allSales.filter((sale) => {
       if (breakdownFilters.scope === "all") return true;
-
       const saleDate = new Date(sale.createdAt);
       const saleYear = Number(
         saleDate.toLocaleString("en-US", { timeZone: PH_TZ, year: "numeric" }),
@@ -271,13 +267,11 @@ const History = () => {
       const saleMonth = Number(
         saleDate.toLocaleString("en-US", { timeZone: PH_TZ, month: "numeric" }),
       );
-
       return (
         saleYear === Number(breakdownFilters.year) &&
         saleMonth === Number(breakdownFilters.month)
       );
     });
-
     breakdownSource.forEach((sale) => {
       const date = new Date(sale.createdAt);
       const dayLabel = date.toLocaleDateString("en-US", {
@@ -287,7 +281,6 @@ const History = () => {
         year: "numeric",
       });
       const daySortValue = date.getTime();
-
       if (!monthly[dayLabel]) {
         monthly[dayLabel] = {
           month: dayLabel,
@@ -296,25 +289,17 @@ const History = () => {
           sortValue: daySortValue,
         };
       }
-
       monthly[dayLabel].orders += 1;
       monthly[dayLabel].sales += sale.totalAmount;
     });
-
     const grouped = Object.values(monthly).sort(
       (a, b) => a.sortValue - b.sortValue,
     );
     grouped.forEach((item, index) => {
       item.id = String(index + 1);
     });
-
     setSalesHistory(grouped);
-  }, [
-    allSales,
-    breakdownFilters.scope,
-    breakdownFilters.year,
-    breakdownFilters.month,
-  ]);
+  }, [allSales, breakdownFilters]);
 
   const monthlyTotalRevenue = salesHistory.reduce(
     (acc, item) => acc + item.sales,
@@ -353,7 +338,6 @@ const History = () => {
       >
         <div className="flex flex-col gap-4 sm:gap-6 lg:flex-row lg:items-end lg:gap-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 flex-1">
-            {/* Date From */}
             <div className="flex flex-col">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                 <MdCalendarToday className="w-4 h-4" />
@@ -368,8 +352,6 @@ const History = () => {
                 className="w-full px-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-gray-50 hover:bg-white"
               />
             </div>
-
-            {/* Date To */}
             <div className="flex flex-col">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                 <MdCalendarToday className="w-4 h-4" />
@@ -384,8 +366,6 @@ const History = () => {
                 className="w-full px-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all duration-200 bg-gray-50 hover:bg-white"
               />
             </div>
-
-            {/* Payment Filter */}
             <div className="flex flex-col">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                 <MdPayments className="w-4 h-4" />
@@ -404,8 +384,6 @@ const History = () => {
               </select>
             </div>
           </div>
-
-          {/* Buttons */}
           <div className="flex gap-3">
             <button
               onClick={() => {
@@ -470,8 +448,6 @@ const History = () => {
               {showRefreshSuccess ? "Updated" : "Refresh"}
             </motion.button>
           </div>
-
-          {/* Error Toast */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -479,9 +455,7 @@ const History = () => {
               className="p-4 bg-red-100 border border-red-400 text-red-800 rounded-2xl mb-4 shadow-lg"
             >
               <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span>{error}</span>
-                </span>
+                <span>{error}</span>
                 <button
                   onClick={() => setError(null)}
                   className="text-red-600 hover:text-red-800 font-bold text-xl p-1 -m-1 rounded hover:bg-red-200"
@@ -491,8 +465,6 @@ const History = () => {
               </div>
             </motion.div>
           )}
-
-          {/* Validation Warning */}
           {!isValidDates && (
             <motion.p
               initial={{ opacity: 0, scale: 0.95 }}
@@ -503,8 +475,6 @@ const History = () => {
             </motion.p>
           )}
         </div>
-
-        {/* Sort Order Toggles */}
         <div className="mt-4 flex gap-4">
           <div className="flex items-center gap-1">
             <input
@@ -557,7 +527,6 @@ const History = () => {
             </h2>
           </div>
         </div>
-
         {todaySales.length > 0 ? (
           <div className="space-y-4 sm:space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -581,8 +550,6 @@ const History = () => {
                 </p>
               </div>
             </div>
-
-            {/* Top Products Today */}
             <div className="mt-6 sm:mt-8">
               <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4 flex items-center gap-2">
                 <MdLocalOffer className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500" />
@@ -655,11 +622,13 @@ const History = () => {
             </h2>
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className="border-b-2 border-gray-200">
+                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600 text-sm sm:text-base whitespace-nowrap">
+                  #
+                </th>
                 <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 cursor-pointer hover:text-green-600 text-sm sm:text-base whitespace-nowrap">
                   Date
                 </th>
@@ -692,6 +661,9 @@ const History = () => {
                     transition={{ delay: index * 0.02 }}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
+                    <td className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-indigo-600 text-xs sm:text-sm whitespace-nowrap cursor-pointer hover:underline" onClick={() => openSaleDetail(sale.id)}>
+                      #{sale.id.slice(-8).toUpperCase()}
+                    </td>
                     <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-xs sm:text-sm whitespace-nowrap">
                       {new Date(sale.createdAt).toLocaleDateString()}{" "}
                       <span className="hidden sm:inline">
@@ -735,10 +707,9 @@ const History = () => {
                     </td>
                   </motion.tr>
 
-                  {/* Expanded Product Details */}
                   {expandedSales[sale.id] && (
                     <tr className="bg-gray-50">
-                      <td colSpan={7} className="py-3 sm:py-4 px-3 sm:px-6">
+                      <td colSpan="8" className="py-3 sm:py-4 px-3 sm:px-6">
                         <div className="rounded-xl border border-gray-200 overflow-hidden">
                           <table className="w-full">
                             <thead className="bg-gray-100">
@@ -759,10 +730,7 @@ const History = () => {
                             </thead>
                             <tbody>
                               {sale.saleItems?.map((item) => (
-                                <tr
-                                  key={item.id}
-                                  className="border-t border-gray-100"
-                                >
+                                <tr key={item.id} className="border-t border-gray-100">
                                   <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-gray-900">
                                     {item.product?.name || "Unknown Product"}
                                   </td>
@@ -773,16 +741,13 @@ const History = () => {
                                     ₱{item.price.toLocaleString()}
                                   </td>
                                   <td className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-semibold text-green-600">
-                                    ₱
-                                    {(
-                                      item.price * item.quantity
-                                    ).toLocaleString()}
+                                    ₱{(item.price * item.quantity).toLocaleString()}
                                   </td>
                                 </tr>
                               ))}
                               <tr className="border-t border-gray-200 bg-gray-50">
                                 <td
-                                  colSpan={3}
+                                  colSpan="3"
                                   className="py-2 sm:py-3 px-2 sm:px-4 text-right text-xs sm:text-sm font-semibold text-gray-800"
                                 >
                                   Total:
@@ -802,7 +767,7 @@ const History = () => {
               {filteredSales.length === 0 && !isLoading && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan="8"
                     className="py-8 sm:py-12 text-center text-gray-500 text-sm sm:text-base"
                   >
                     {rawSales.length === 0
@@ -814,6 +779,12 @@ const History = () => {
             </tbody>
           </table>
         </div>
+        <SaleDetailModal 
+          isOpen={!!selectedSaleId}
+          onClose={closeSaleDetail}
+          sale={selectedSale}
+          loading={modalLoading}
+        />
       </motion.div>
 
       {/* Monthly Sales Table */}
@@ -840,7 +811,6 @@ const History = () => {
               </span>
             </div>
           </div>
-
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <select
               value={breakdownFilters.scope}
@@ -855,7 +825,6 @@ const History = () => {
               <option value="all">All Time</option>
               <option value="month">Specific Month</option>
             </select>
-
             {breakdownFilters.scope === "month" && (
               <>
                 <select
@@ -868,19 +837,15 @@ const History = () => {
                   }
                   className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm"
                 >
-                  {Array.from(
-                    { length: new Date().getFullYear() - 2026 + 1 },
-                    (_, idx) => {
-                      const y = 2026 + idx;
-                      return (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      );
-                    },
-                  )}
+                  {Array.from({ length: new Date().getFullYear() - 2024 + 1 }, (_, idx) => {
+                    const y = 2024 + idx;
+                    return (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    );
+                  })}
                 </select>
-
                 <select
                   value={breakdownFilters.month}
                   onChange={(e) =>
@@ -892,18 +857,8 @@ const History = () => {
                   className="px-2 sm:px-3 py-2 border border-gray-300 rounded-lg bg-white text-xs sm:text-sm"
                 >
                   {[
-                    "January",
-                    "February",
-                    "March",
-                    "April",
-                    "May",
-                    "June",
-                    "July",
-                    "August",
-                    "September",
-                    "October",
-                    "November",
-                    "December",
+                    "January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December",
                   ].map((m, idx) => (
                     <option key={m} value={idx + 1}>
                       {m}
@@ -914,7 +869,6 @@ const History = () => {
             )}
           </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full min-w-[500px]">
             <thead>

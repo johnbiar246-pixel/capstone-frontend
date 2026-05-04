@@ -83,70 +83,77 @@
       navigate("/scan-table");
     };
 
-    const fetchOrders = async () => {
+const fetchOrders = async () => {
       if (!tableNumber) return;
       
       setOrdersLoading(true);
       setOrdersError("");
       try {
-      const response = await getOrdersByTable(tableNumber);
-      
-      // Calculate breakdown for each order (matches CartContext logic)
-      const ordersWithBreakdown = response.data.map(order => {
-        const safeItems = (order.orderItems || []).filter(item => item);
+        const response = await getOrdersByTable(tableNumber);
         
-        let subtotal = 0;
-        let foodSubtotal = 0;
+        if (!response.success) {
+          throw new Error(response.message || "Failed to fetch orders");
+        }
         
-        safeItems.forEach(item => {
-          const price = Number(item.price || item.product?.price || 0);
-          const qty = Number(item.quantity || 0);
-          const itemTotal = price * qty;
-          subtotal += Math.max(0, itemTotal);
-          
-          // Match CartContext food categories exactly
-          const catName = (item.category?.name || item.product?.category?.name || '')
-            .toLowerCase().replace(/\s+/g, '-');
-          const isFood = ['appetizers', 'main-dishes'].includes(catName);
-          if (isFood) {
-            foodSubtotal += Math.max(0, itemTotal);
-          }
+        // Filter only pending and preparing orders (hide completed and other statuses)
+        const allOrders = response.data || [];
+        const relevantOrders = allOrders.filter(order => 
+          order.status?.toLowerCase() === 'pending' ||
+          order.status?.toLowerCase() === 'preparing'
+        );
+        
+        // Sort: pending first, then preparing
+        relevantOrders.sort((a, b) => {
+          const statusOrder = { pending: 1, preparing: 2 };
+          return (statusOrder[a.status?.toLowerCase()] || 3) - (statusOrder[b.status?.toLowerCase()] || 3);
         });
         
-        const customerType = order.customerType || 'REGULAR';
-        const discountAmount = (customerType === 'PWD' || customerType === 'SENIOR') ? foodSubtotal * 0.2 : 0;
-        const applicableAmount = subtotal - discountAmount;
-        const serviceCharge = Math.max(0, applicableAmount * 0.1);
-        const total = Math.max(0, applicableAmount + serviceCharge);
-
+        // Calculate breakdown for each order (matches CartContext logic) and ensure unique keys
+        const safeNum = (val) => Number(val ?? 0);
         
-        return {
-          ...order,
-          subtotal: parseFloat(subtotal.toFixed(2)),
-          foodSubtotal: parseFloat(foodSubtotal.toFixed(2)),
-          discount: parseFloat(discount.toFixed(2)),
-          serviceCharge: parseFloat(serviceCharge.toFixed(2)),
-          total: parseFloat(total.toFixed(2))
-        };
-      });
-      
-      setOrders(ordersWithBreakdown);
-        if (response.success) {
-          // Filter preparing, completed, and pending orders (waiting for cashier)
-          let relevantOrders = response.data.filter(order => 
-            order.status?.toLowerCase() === 'pending' ||
-            order.status?.toLowerCase() === 'preparing' || 
-            order.status?.toLowerCase() === 'completed'
-          );
+        const ordersWithBreakdown = relevantOrders.map((order, index) => {
+          const safeItems = (order.orderItems || []).filter(item => item);
           
-          // Sort: pending first, then preparing, then completed
-          relevantOrders.sort((a, b) => {
-            const statusOrder = { pending: 1, preparing: 2, completed: 3 };
-            return (statusOrder[a.status?.toLowerCase()] || 4) - (statusOrder[b.status?.toLowerCase()] || 4);
+          let subtotal = 0;
+          let foodSubtotal = 0;
+          
+          safeItems.forEach(item => {
+            const price = safeNum(item.price || item.product?.price);
+            const qty = safeNum(item.quantity);
+            const itemTotal = price * qty;
+            subtotal += Math.max(0, itemTotal);
+            
+            // Match CartContext food categories exactly
+            const catName = (item.category?.name || item.product?.category?.name || '')
+              .toLowerCase().replace(/\s+/g, '-');
+            const isFood = ['appetizers', 'main-dishes'].includes(catName);
+            if (isFood) {
+              foodSubtotal += Math.max(0, itemTotal);
+            }
           });
           
-          setOrders(relevantOrders);
-        }
+          const customerType = order.customerType || 'REGULAR';
+          const discountAmount = (customerType === 'PWD' || customerType === 'SENIOR') ? foodSubtotal * 0.2 : safeNum(order.discount);
+          const applicableAmount = subtotal - discountAmount;
+          const serviceCharge = Math.max(0, applicableAmount * 0.1);
+          const total = Math.max(0, applicableAmount + serviceCharge);
+
+          // Generate a unique key using id + orderNumber + index fallback
+          const uniqueKey = order.id || order.orderNumber || `order-${index}`;
+          
+          return {
+            ...order,
+            _uniqueKey: uniqueKey, // Used for React key
+            subtotal: parseFloat(subtotal.toFixed(2)),
+            foodSubtotal: parseFloat(foodSubtotal.toFixed(2)),
+            discount: safeNum(order.discount),
+            serviceCharge: safeNum(order.serviceCharge),
+            totalAmount: safeNum(order.totalAmount),
+            total: parseFloat(total.toFixed(2))
+          };
+        });
+        
+        setOrders(ordersWithBreakdown);
       } catch (err) {
         console.error("Error fetching orders:", err);
         setOrdersError("Failed to load orders");
@@ -390,16 +397,13 @@ const transformedProducts = response.data.data.map((product) => ({
           </motion.div>
 
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {orders.map((order) => {
-              //  USE PRE-CALCULATED VALUES
-              const orderSubtotal = order.subtotal || 0;
-              const orderServiceCharge = order.serviceCharge || 0;
-              const orderTotal = order.total || 0;
-
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {orders.map((order, index) => {
+              // Use unique key to prevent duplicate key warnings
+              const orderKey = order._uniqueKey || order.id || order.orderNumber || `order-${index}`;
               return (
                 <motion.div
-                  key={order.id}
+                  key={orderKey}
                   className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all"
                   whileHover={{ y: -2 }}
                 >
@@ -427,40 +431,25 @@ const transformedProducts = response.data.data.map((product) => ({
                   </p>
 
                   <div className="flex justify-between items-center">
-  {/* Hide totals when PREPARING; special UX for pending zero */}
-  {order.status?.toLowerCase() === "preparing" ? (
-    <div className="text-sm text-orange-600 font-semibold">
-      Payment confirmed. Preparing your order...
-    </div>
-  ) : orderSubtotal === 0 && order.status?.toLowerCase() === "pending" ? (
-    <div className="text-sm text-gray-500 italic">
-      ⏳ Awaiting staff confirmation...
-    </div>
-  ) : (
-    <div className="space-y-1 text-right">
-      <div className="text-sm text-gray-600 flex justify-between">
-        <span>Subtotal:</span>
-        <span>₱{orderSubtotal.toFixed(2)}</span>
-      </div>
+                    <div className="text-sm text-gray-600">
+                      {order.status?.toLowerCase() === "preparing" ? (
+                        <span className="text-orange-600 font-semibold">
+                          Payment confirmed. Preparing your order...
+                        </span>
+                      ) : order.status?.toLowerCase() === "pending" ? (
+                        <span className="text-gray-500 italic">
+                          ⏳ Awaiting staff confirmation...
+                        </span>
+                      ) : (
+                        <span>Order in progress</span>
+                      )}
+                    </div>
 
-      {orderServiceCharge > 0 && (
-        <div className="text-sm text-emerald-600 font-medium flex justify-between">
-          <span>Service (10%):</span>
-          <span>+₱{orderServiceCharge.toFixed(2)}</span>
-        </div>
-      )}
-
-      <span className="text-lg font-bold text-[#254F22] block">
-        TOTAL: ₱{orderTotal.toFixed(2)}
-      </span>
-    </div>
-  )}
-
-  <StatusBadge
-    status={order.status}
-    className="!text-sm px-3 py-1"
-  />
-</div>
+                    <StatusBadge
+                      status={order.status}
+                      className="!text-sm px-3 py-1"
+                    />
+                  </div>
                 </motion.div>
               );
             })}
@@ -588,9 +577,9 @@ const transformedProducts = response.data.data.map((product) => ({
                 animate="visible"
               >
                 <AnimatePresence>
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.map((product, index) => (
                     <motion.div
-                      key={product.id}
+                      key={`product-${product.id || index}`}
                       className="bg-white rounded-xl shadow-md overflow-hidden group cursor-pointer"
                       variants={itemVariants}
                       whileHover={{

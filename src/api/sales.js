@@ -1,5 +1,5 @@
 import axios from "axios";
-import { useAuth } from "../contexts/AuthContext.jsx";
+
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
@@ -14,32 +14,46 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Create a sale (complete POS transaction)
-export const createSale = async (
-  items,
-  paymentMethod,
-  tableId,
-  referenceNo = null,
-) => {
-  // Get userId if available (for logged in users), otherwise use guest mode
-  const userId =
-    localStorage.getItem("userId") || sessionStorage.getItem("userId") || null;
+// Unified checkout - creates Order + Sale atomically
+export const checkout = async (items, tableId, paymentMethod, referenceNo = null, amountTendered = null, customerType = "REGULAR") => {
+  const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId") || null;
+  
+  const res = await api.post("/checkout", {
+    ...(userId && { userId }),
+    items,
+    tableId,
+    paymentMethod,
+    ...(referenceNo && { referenceNo }),
+    ...(amountTendered && { amountTendered }),
+    customerType,
+  });
 
-  const response = await api.post(`/sales`, {
-    ...(userId && { userId }), // Only include userId if available
+  return res.data;
+};
+
+// Legacy createSale (deprecated - use checkout)
+export const createSale = async (items, paymentMethod, tableId, referenceNo = null, orderId = null) => {
+  console.warn("createSale deprecated - use checkout instead");
+  const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId") || null;
+  
+  const res = await api.post("/sales", {
+    ...(userId && { userId }),
+    ...(orderId && { orderId }),
     paymentMethod,
     items,
     tableId,
     ...(referenceNo && { referenceNo }),
   });
-  return response.data;
+
+  return res.data.data;
 };
+
 
 // Get sales with filters
-export const getSales = (params) => {
-  return api.get("/sales", { params });
+export const getSales = async (params) => {
+  const res = await api.get("/sales", { params });
+  return res.data.data;
 };
-
 // Get sales for current user
 export const getUserSales = async () => {
   const userId =
@@ -61,6 +75,13 @@ export const updateSaleStatus = async (saleId, status) => {
   const response = await api.patch(`/sales/${saleId}/status`, { status });
   return response.data;
 };
+// Get sale by ID (for order details)
+export const getSaleById = async (saleId) => {
+  const res = await api.get(`/sales/${saleId}`);
+  return res.data.data;
+};
+
+
 // Get recent sales
 export const getRecentSales = async (limit = 10) => {
   const response = await api.get(`/sales?_limit=${limit}`);
@@ -70,5 +91,7 @@ export const getRecentSales = async (limit = 10) => {
 export default {
   createSale,
   getSales,
+  checkout,
+  getSaleById,
   getRecentSales,
 };

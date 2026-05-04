@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useCart } from "../../contexts/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   MdRestaurantMenu,
@@ -16,10 +17,15 @@ import {
 } from "react-icons/md";
 
 import { getProducts, getCategories } from "../../api/products.js";
-import { createOrder } from "../../api/orders.js";
 import { getAllTables } from "../../api/tables.js";
+import { getPendingOrders } from "../../api/orders.js";
+import { createSale } from "../../api/sales.js";
 import UnifiedPaymentModal from "../../components/modal/UnifiedPaymentModal";
 import ReceiptModal from "../../components/modal/ReceiptModal";
+import { useNavigate } from "react-router-dom";
+import { MdAccessTime } from "react-icons/md";
+import io from 'socket.io-client';
+
 
 const categories = [
   {
@@ -61,27 +67,68 @@ const categories = [
 ];
 
 const Cashier = () => {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
+
   const [products, setProducts] = useState([]);
   const [categoriesList, setCategoriesList] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [cart, setCart] = useState([]);
+  const { cart, addToCart, updateQuantity, removeFromCart, getCartTotal, customerType, setCustomerType, clearCart, calculateCartBreakdown } = useCart();
   const [loading, setLoading] = useState(true);
-
-  const [customerType, setCustomerType] = useState("REGULAR");
-  const [tables, setTables] = useState([]);
+  const [tables, setTables] = useState([]);  
   const [selectedTableId, setSelectedTableId] = useState("");
   const [userId, setUserId] = useState(localStorage.getItem("userId"));
   const [notification, setNotification] = useState(null);
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [pendingOrdersLoading, setPendingOrdersLoading] = useState(false);
 
-  // Load data
+  // Load data + Socket.io
   useEffect(() => {
     loadData();
+    
+    const socket = io(import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001');
+    
+    socket.on('ordersUpdate', () => {
+      console.log('Real-time orders update - refetching pending');
+      fetchPendingOrders();
+    });
+
+    // Initial + poll fallback
+    fetchPendingOrders();
+    const interval = setInterval(fetchPendingOrders, 10000);
+
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
   }, []);
+
+  const fetchPendingOrders = async () => {
+    setPendingOrdersLoading(true);
+    try {
+      const response = await getPendingOrders();
+      if (response.data && response.data.success) {
+        const transformedOrders = response.data.data.map(order => ({
+          id: order.id.toString(),
+          orderNumber: order.orderNumber,
+          details: order.orderItems.map(item => `${item.quantity}x ${item.product?.name || "Item"}`).join(", "),
+          totalAmount: Number(order.totalAmount ?? 0),
+          status: order.status?.toLowerCase() || "preparing",
+          time: new Date(order.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          tableNumber: order.table?.number || "N/A",
+        }));
+        setPendingOrders(transformedOrders);
+      }
+    } catch (error) {
+      console.error("Error fetching pending orders:", error);
+    } finally {
+      setPendingOrdersLoading(false);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -119,96 +166,43 @@ const Cashier = () => {
     setFilteredProducts(filtered);
   }, [activeCategory, searchQuery, products]);
 
-  const addToCart = (product) => {
-    const existing = cart.find((item) => item.id === product.id);
-    if (existing) {
-      setCart(
-        cart.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item,
-        ),
-      );
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
-    }
-  };
-
-  const updateQuantity = (productId, delta) => {
-    setCart(
-      cart
-        .map((item) => {
-          if (item.id === productId) {
-            const newQty = Math.max(0, item.quantity + delta);
-            return newQty > 0 ? { ...item, quantity: newQty } : item;
-          }
-          return item;
-        })
-        .filter((item) => item.quantity > 0),
-    );
-  };
-
-  const removeFromCart = (productId) => {
-    setCart(cart.filter((item) => item.id !== productId));
-  };
-
-  const getCartBreakdown = () => {
-    let subtotal = 0;
-    let foodSubtotal = 0;
-    cart.forEach(item => {
-      const itemTotal = item.price * item.quantity;
-      subtotal += itemTotal;
-      const categoryName = item.category?.name?.toLowerCase() || '';
-      const isFood = ['appetizers', 'main-dishes'].includes(categoryName);
-      if (isFood) foodSubtotal += itemTotal;
-    });
-    const discount = (customerType === 'PWD' || customerType === 'SENIOR') ? foodSubtotal * 0.2 : 0;
-    const serviceCharge = foodSubtotal * 0.1;
-    const total = subtotal + serviceCharge - discount;
-    return { subtotal, discount, serviceCharge, total };
-  };
-
-  const getTotal = () => getCartBreakdown().total;
+  // Cart functions now from useCart() - local overrides removed
+  const { placeOrder } = useCart();
+  const getTotal = getCartTotal;
 
   const showNotification = (message, type = "info") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleUnifiedConfirm = async (total, paymentDetails) => {
-    try {
-      const items = cart.map((item) => ({
-        productId: item.id,
-        quantity: item.quantity,
-        price: item.price,
-      }));
+const handleUnifiedConfirm = async (total, paymentDetails) => {
+      try {
 
-      const response = await createOrder(
-        items,
-        selectedTableId,
-        "PREPARING",
-        paymentDetails.paymentMethod,
-        null, // No GCash ref needed
-        paymentDetails.amountTendered,
-        customerType
-      );
+        const response = await placeOrder(
+          selectedTableId,
+          paymentDetails.paymentMethod,
+          paymentDetails.referenceNo,
+          paymentDetails.amountTendered,
+          customerType,
+          undefined,
+          "cashier"  // Cashier mode for staff ordering
+        );
 
-      const orderId = response.data.id;
+        showNotification(
+          `Payment completed! Order #${response.order?.orderNumber || response.order?.id || 'N/A'}`,
+          "success"
+        );
 
-      showNotification(
-        `Payment completed! Order #${response.data.orderNumber || response.data.id}. Total: ₱${getTotal().toFixed(2)} (CASH) Table ${tables.find((t) => t.id === selectedTableId)?.number || "N/A"}`,
-        "success"
-      );
-      setCart([]);
-      setSelectedTableId("");
-      setShowUnifiedModal(false);
-      setSelectedOrderId(orderId);
-      setShowReceiptModal(true);
-      loadData();
-    } catch (error) {
-      showNotification("Order creation failed: " + error.message, "error");
-    }
-  };
+        clearCart();
+        setSelectedTableId("");
+        setShowUnifiedModal(false);
+
+
+
+      } catch (error) {
+        showNotification("Order creation failed: " + (error.response?.data?.message || error.message), "error");
+      }
+    };
 
   if (loading) {
     return (
@@ -220,6 +214,62 @@ const Cashier = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      {/* Upcoming Orders Section */}
+      {pendingOrders.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-7xl mx-auto mb-8"
+        >
+          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-6 rounded-2xl shadow-2xl">
+            <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+              <MdAccessTime className="w-8 h-8" />
+              Upcoming Orders ({pendingOrders.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+              {pendingOrders.map((order) => (
+                <motion.div
+                  key={order.id}
+                  whileHover={{ scale: 1.02 }}
+                  className="bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-white/50"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-bold text-lg text-gray-900">
+                        #{order.orderNumber || order.id.slice(-4)}
+                      </p>
+                      <p className="text-sm text-gray-600">{order.time}</p>
+                      <span className="inline-block mt-1 px-2 py-1 bg-yellow-200 text-yellow-800 text-xs font-semibold rounded-full">
+                        Table #{order.tableNumber}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 mb-3 text-sm line-clamp-2">{order.details}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xl text-gray-900">
+                      ₱{order.totalAmount.toFixed(2)}
+                    </span>
+                    <motion.button
+                      onClick={() => navigate(`/user/orders?table=${order.tableNumber}`)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-600 hover:to-green-700 transition-all"
+                    >
+                      Accept
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+            {pendingOrdersLoading && (
+              <div className="text-center py-4 text-white/80">
+                Loading upcoming orders...
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6 h-screen">
         {/* Middle: Categories + Products */}
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-6 overflow-hidden flex flex-col">
@@ -330,9 +380,9 @@ const Cashier = () => {
           ) : (
             <>
               <div className="space-y-3 mb-6 max-h-96 overflow-y-auto">
-                {cart.map((item) => (
+                {cart.map((item, index) => (
                   <div
-                    key={item.id}
+                    key={`cart-item-${item.id || index}`}
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                   >
                     <div className="flex-1">
@@ -460,16 +510,18 @@ const Cashier = () => {
       </AnimatePresence>
 
       {/* Unified Payment Modal */}
-      <UnifiedPaymentModal
-        isOpen={showUnifiedModal}
-        onClose={() => setShowUnifiedModal(false)}
-        onConfirm={handleUnifiedConfirm}
-        totalAmount={getTotal()}
-        cartItems={cart}
-        customerType={customerType}
-        tableNumber={tables.find(t => t.id === selectedTableId)?.number}
-        autoFill={false}
-      />
+<UnifiedPaymentModal
+  isOpen={showUnifiedModal}
+  onClose={() => setShowUnifiedModal(false)}
+  onConfirm={handleUnifiedConfirm}
+  cartItems={cart}
+  customerType={customerType}
+  tableNumber={
+    tables?.find((t) => t.id === selectedTableId)?.number ?? null
+  }
+  mode="staff-new"
+  autoFill={false}
+/>
 
       {/* Receipt Modal */}
       <ReceiptModal

@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { createOrder } from "../api/orders";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { checkout as checkoutApi } from "../api/sales.js";
+import { createOrder } from "../api/orders.js";
 
 const CartContext = createContext();
 
@@ -16,7 +17,24 @@ export const CartProvider = ({ children }) => {
 // Load cart from localStorage on initial render
     if (typeof window !== "undefined") {
       const savedCart = localStorage.getItem("cart");
-      return savedCart ? JSON.parse(savedCart) : [];
+      if (savedCart) {
+        try {
+          const parsedCart = JSON.parse(savedCart);
+          // Validate and clean cart items
+          const validCart = parsedCart.filter(item => 
+            item && 
+            typeof item === 'object' && 
+            (item.id || item._id || item.productId) &&
+            item.name &&
+            typeof item.price === 'number' &&
+            typeof item.quantity === 'number' && item.quantity > 0
+          );
+          return validCart;
+        } catch (error) {
+          console.warn('Failed to parse cart from localStorage:', error);
+          return [];
+        }
+      }
     }
     return [];
   });
@@ -44,11 +62,31 @@ export const CartProvider = ({ children }) => {
   }, [cart]);
 
   const addToCart = (product) => {
+    // Validate product
+    if (!product || typeof product !== 'object') {
+      console.warn('Invalid product passed to addToCart:', product);
+      return;
+    }
+
+    if (!product.id && !product._id && !product.productId) {
+      console.warn('Product missing ID:', product);
+      return;
+    }
+
+    if (!product.name || typeof product.price !== 'number') {
+      console.warn('Product missing required fields:', product);
+      return;
+    }
+
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === product.id);
+      const existingItem = prevCart.find((item) => 
+        item.id === product.id || 
+        item._id === product._id || 
+        item.productId === product.productId
+      );
       if (existingItem) {
         return prevCart.map((item) =>
-          item.id === product.id
+          (item.id === product.id || item._id === product._id || item.productId === product.productId)
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         );
@@ -57,8 +95,7 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  // Calculate pricing breakdown (matches backend logic)
-const calculateCartBreakdown = (items = cart, custType = customerType) => {
+  const calculateCartBreakdown = useCallback((items = cart, custType = customerType) => {
     let subtotal = 0;
     let foodSubtotal = 0;
 
@@ -69,11 +106,9 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
       const catName = (item.category?.name || '').toLowerCase();
       const catId = (item.categoryId || '').toLowerCase();
       const isFood = ['appetizers', 'main-dishes'].includes(catName) || ['appetizers', 'main-dishes'].includes(catId);
-      console.log(`Item ${item.name}: catName="${catName}", catId="${catId}", isFood=${isFood}, itemTotal=${itemTotal}`);
       if (isFood) {
         foodSubtotal += itemTotal;
       }
-
     });
 
     const discountAmount = (custType === 'PWD' || custType === 'SENIOR') 
@@ -83,7 +118,6 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
     const applicableAmount = subtotal - discountAmount;
     const serviceCharge = applicableAmount * 0.1;
     const total = applicableAmount + serviceCharge;
-
     const nonFoodSubtotal = subtotal - foodSubtotal;
 
     return { 
@@ -94,15 +128,15 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
       serviceCharge: parseFloat(serviceCharge.toFixed(2)),
       total: parseFloat(total.toFixed(2))
     };
-  };
+  }, [cart, customerType]);
 
-  const getCartTotal = () => {
-    const breakdown = calculateCartBreakdown();
-    return parseFloat(breakdown.total);
-  };
+  const cartBreakdown = useMemo(() => calculateCartBreakdown(cart), [calculateCartBreakdown, cart]);
+  const getCartTotal = () => cartBreakdown.total;
 
   const removeFromCart = (productId) => {
-    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+    setCart((prevCart) => prevCart.filter((item) => 
+      !(item.id === productId || item._id === productId || item.productId === productId)
+    ));
   };
 
   const updateQuantity = (productId, quantity) => {
@@ -112,7 +146,9 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
     }
     setCart((prevCart) =>
       prevCart.map((item) =>
-        item.id === productId ? { ...item, quantity } : item,
+        (item.id === productId || item._id === productId || item.productId === productId)
+          ? { ...item, quantity } 
+          : item,
       ),
     );
   };
@@ -131,18 +167,38 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
   const closeCart = () => setIsCartOpen(false);
   const toggleCart = () => setIsCartOpen((prev) => !prev);
 
-  // Place order function
+// Place order function
   const placeOrder = async (
     tableId,
     paymentMethod = null,
     referenceNo = null,
     amountTendered = null,
     customerTypeParam = null,
-    breakdown = null,  // New: accept breakdown param
+    breakdown = null,
+    mode = "customer",  // "customer" | "cashier"
+    source = null,  // Optional: explicitly set source, otherwise derived from mode
   ) => {
     const finalCustomerType = customerTypeParam || customerType;
     if (cart.length === 0) {
       throw new Error("Cart is empty");
+    }
+
+    // Determine status and source based on mode or explicit source parameter
+    let status, finalSource;
+    
+    if (source) {
+      // Explicit source provided
+      finalSource = source;
+      status = source === "CASHIER" ? "PREPARING" : "PENDING";
+    } else {
+      // Derive from mode
+      if (mode === "cashier") {
+        finalSource = "CASHIER";
+        status = "PREPARING";
+      } else {
+        finalSource = "CUSTOMER";
+        status = "PENDING";
+      }
     }
 
     // Transform cart items to API format
@@ -152,18 +208,30 @@ const calculateCartBreakdown = (items = cart, custType = customerType) => {
       price: item.price,
     }));
 
-    // Call API to create order (not sale yet - will become sale when completed)
-    // Note: For customer orders, paymentMethod and referenceNo are stored but not required
-    const response = await createOrder(items, tableId, "PENDING", paymentMethod, referenceNo, amountTendered, finalCustomerType, breakdown);
+    // Call API to create order
+    const response = await createOrder(
+      items,
+      tableId,
+      status,
+      paymentMethod,
+      referenceNo,
+      amountTendered,
+      finalCustomerType,
+      calculateCartBreakdown(cart, finalCustomerType),
+      finalSource
+    );
 
     // Clear cart after successful order
     if (response.success) {
       clearCart();
       closeCart();
+      return { success: true, data: { orderNumber: response.data.orderNumber } };
     }
 
     return response;
   };
+
+
 
   const value = {
     cart,
