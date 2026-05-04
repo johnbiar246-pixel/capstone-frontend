@@ -129,6 +129,7 @@ export const updateOrderStatus = async (
   paymentMethod = null,
   referenceNo = null,
   amountTendered = null,
+  customerType = null
 ) => {
   try {
     const response = await API.patch(`/orders/${orderId}/status`, {
@@ -136,6 +137,7 @@ export const updateOrderStatus = async (
       ...(paymentMethod && { paymentMethod }),
       ...(referenceNo && { referenceNo }),
       ...(amountTendered !== undefined && { amountTendered }),
+      ...(customerType && { customerType }),
     });
     return response.data;
   } catch (error) {

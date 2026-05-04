@@ -13,9 +13,7 @@ import {
   MdWineBar,
 } from "react-icons/md";
 import { useCart } from "../../contexts/CartContext";
-import UnifiedPaymentModal from "../modal/UnifiedPaymentModal";
 import { getTableByNumber } from "../../api/tables";
-import { checkoutOrder } from "../../api/checkout";
 
 const CartSidebar = () => {
   const {
@@ -34,6 +32,8 @@ const CartSidebar = () => {
 
   const { isAuthenticated } = useAuth();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isPlacing, setIsPlacing] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tableNumber = searchParams.get("table");
@@ -58,11 +58,12 @@ const CartSidebar = () => {
       navigate("/scan-table");
       return;
     }
-    setShowPaymentModal(true);
+    setShowConfirmation(true);
   };
 
-  const handlePaymentConfirm = async (total, paymentDetails) => {
+  const handleConfirmOrder = async () => {
     try {
+      setIsPlacing(true);
       const tableResponse = await getTableByNumber(tableNumber);
 
       if (!tableResponse.success || !tableResponse.data) {
@@ -74,21 +75,16 @@ const CartSidebar = () => {
 
       const response = await placeOrder(
         tableId,
-        paymentDetails.paymentMethod,
-        paymentDetails.referenceNo,
-        paymentDetails.amountTendered,
+        null,  // no payment yet
+        null,
+        null,
         customerType,
-        null, // breakdown
-        "customer" // mode
+        null,
+        "customer"
       );
 
       if (response.success) {
-        showNotification(
-          `Order placed successfully! Order #${response.data.orderNumber}`,
-          "success"
-        );
-
-        setShowPaymentModal(false);
+        setShowConfirmation(false);
         clearCart();
         closeCart();
         navigate("/user/orders?tab=upcoming");
@@ -101,6 +97,8 @@ const CartSidebar = () => {
         error.response?.data?.message || "Order failed",
         "error"
       );
+    } finally {
+      setIsPlacing(false);
     }
   };
 
@@ -154,18 +152,61 @@ const CartSidebar = () => {
                   <MdWineBar className="text-2xl text-[#3C3D37]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#F4B860]">My Order</h2>
+                  <h2 className="text-xl font-bold text-[#F4B860]">
+                    {showConfirmation ? "Confirm Order" : "My Order"}
+                  </h2>
                   <p className="text-white/80 text-sm">
                     {getCartItemCount()} item{getCartItemCount() !== 1 ? "s" : ""}
                   </p>
                 </div>
               </div>
-              <button onClick={closeCart} className="text-white/70 hover:text-[#F4B860] p-2">
+              <button
+                onClick={() => showConfirmation ? setShowConfirmation(false) : closeCart()}
+                className="text-white/70 hover:text-[#F4B860] p-2"
+              >
                 <MdClose className="text-2xl" />
               </button>
             </div>
 
-            {/* CART ITEMS */}
+            {showConfirmation ? (
+              /* CONFIRMATION VIEW */
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  <p className="text-sm text-gray-500 mb-2">Table #{tableNumber} — Please review your order:</p>
+                  {cart.map((item, index) => (
+                    <div key={getSafeKey(item, index)} className="bg-white rounded-xl p-4 flex justify-between items-center shadow-sm border border-gray-100">
+                      <div>
+                        <p className="font-semibold text-gray-800">{item.name}</p>
+                        <p className="text-sm text-gray-500">₱{item.price.toFixed(2)} × {item.quantity}</p>
+                      </div>
+                      <p className="font-bold text-[#254F22]">₱{(item.price * item.quantity).toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-6 border-t bg-white">
+                  <div className="flex justify-between mb-4 text-lg font-bold">
+                    <span>Total</span>
+                    <span className="text-[#254F22]">₱{getCartTotal().toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mb-4 text-center">Payment will be collected at the counter after your order is confirmed.</p>
+                  <button
+                    onClick={handleConfirmOrder}
+                    disabled={isPlacing}
+                    className="w-full bg-[#254F22] text-white py-4 rounded-xl font-bold text-lg disabled:opacity-60"
+                  >
+                    {isPlacing ? "Placing Order..." : "Confirm Order"}
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmation(false)}
+                    className="w-full mt-2 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-100"
+                  >
+                    Back to Cart
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* CART VIEW */
+              <>
             <div className="flex-1 overflow-y-auto p-4">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center px-6">
@@ -260,21 +301,11 @@ const CartSidebar = () => {
                 </button>
               </div>
             )}
+              </> /* end cart view */
+            )} {/* end showConfirmation ternary */}
           </motion.div>
         </>
       )}
-
-      {/* PAYMENT MODAL */}
-      <UnifiedPaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onConfirm={handlePaymentConfirm}
-        cartItems={cart}
-        customerType={customerType}
-        tableNumber={tableNumber}
-        mode="customer-new"
-        autoFill={false}
-      />
     </AnimatePresence>
   );
 };

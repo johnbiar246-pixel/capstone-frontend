@@ -182,7 +182,7 @@ const handleUnifiedConfirm = async (total, paymentDetails) => {
           paymentDetails.paymentMethod,
           paymentDetails.referenceNo,
           paymentDetails.amountTendered,
-          customerType,
+          paymentDetails.customerType,  // Use customerType from modal selection, not context
           undefined,
           "cashier"  // Cashier mode for staff ordering
         );

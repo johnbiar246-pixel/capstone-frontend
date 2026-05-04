@@ -38,7 +38,13 @@ const UnifiedPaymentModal = ({
     items.forEach(item => {
       const itemTotal = item.price * item.quantity;
       subtotal += itemTotal;
-      const catName = (item.category?.name || item.categoryId || '').toLowerCase().replace(/\s+/g, '-');
+      // cartItems have category on the item directly; orderItems have it under item.product.category
+      const catName = (
+        item.category?.name ||
+        item.product?.category?.name ||
+        item.categoryId ||
+        ''
+      ).toLowerCase().replace(/\s+/g, '-');
       const isFood = ['appetizers', 'main-dishes'].includes(catName);
       if (isFood) {
         foodSubtotal += itemTotal;
@@ -62,6 +68,9 @@ const UnifiedPaymentModal = ({
   // SAFE BREAKDOWN
   const breakdown = useMemo(() => {
     const itemsToUse = cartItems.length > 0 ? cartItems : orderItems;
+    console.log("Cart Items:", cartItems);
+    console.log("Order Items:", orderItems);
+    console.log("Calculating breakdown with items:", itemsToUse, "and customerType:", customerType);
 
     if (itemsToUse.length > 0) {
       return calculateLocalBreakdown(itemsToUse, customerType);
@@ -199,7 +208,7 @@ const UnifiedPaymentModal = ({
             </div>
 
             {/* CUSTOMER TYPE (Radio - exclusive) */}
-            {(mode === "customer-new" || mode === "staff-new") && (
+            {(mode === "customer-new" || mode === "staff-new" || mode === "staff-accept") && (
               <div>
                 <label className="block text-sm font-bold mb-3 flex items-center gap-2 text-gray-700">
                   Customer Type

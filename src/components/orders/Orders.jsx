@@ -212,7 +212,8 @@ const Orders = () => {
         "PREPARING",
         payment.paymentMethod,
         payment.referenceNo,
-        payment.amountTendered
+        payment.amountTendered,
+        payment.customerType
       );
 
       showNotification("Order accepted");
@@ -556,7 +557,11 @@ const Orders = () => {
         onClose={() => setShowUnifiedModal(false)}
         onConfirm={handleUnifiedConfirm}
         orderItems={selectedOrderForPayment?.orderItems || []}
-        totalAmount={selectedOrderForPayment?.totalAmount || 0}
+        orderId={selectedOrderForPayment?.id || null}
+        customerType={selectedOrderForPayment?.customerType || "REGULAR"}
+        tableNumber={selectedOrderForPayment?.table?.number || null}
+        mode="staff-accept"
+        autoFill={true}
       />
 
       <TenderModal

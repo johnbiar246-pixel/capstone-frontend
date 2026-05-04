@@ -43,6 +43,8 @@ export const OrdersProvider = ({ children }) => {
             price: i.price,
             quantity: i.quantity,
             servedQuantity: i.servedQuantity || 0,
+            categoryId: i.product?.categoryId,
+            product: i.product,
           })),
         }));
         setOrders(formattedOrders);
