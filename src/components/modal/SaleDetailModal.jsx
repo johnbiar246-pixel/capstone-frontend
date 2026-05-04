@@ -5,8 +5,22 @@ import { MdClose, MdPayments, MdListAlt } from "react-icons/md";
 const SaleDetailModal = ({ isOpen, onClose, sale }) => {
   if (!isOpen || !sale) return null;
 
-  const orderNumber = sale.id.slice(-8).toUpperCase(); // Short readable # from UUID
+  const order = sale.order || {};
+  const orderNumber = order.orderNumber || sale.id.slice(-8).toUpperCase();
   const gcashRef = sale.referenceNo ? `*****${sale.referenceNo.slice(-5)}` : null;
+  const table = order.table || sale.table;
+  const user = order.user || sale.user;
+
+  // Pricing from Order (has discount/serviceCharge) or fall back to Sale totals
+  const subtotal = order.foodSubtotal != null
+    ? (order.foodSubtotal + (order.nonFoodSubtotal || 0))
+    : sale.saleItems?.reduce((s, i) => s + i.price * i.quantity, 0) || 0;
+  const discount = order.discount || 0;
+  const serviceCharge = order.serviceCharge || 0;
+  const totalAmount = sale.totalAmount || order.totalAmount || 0;
+  const amountTendered = order.amountTendered || null;
+  const change = order.change || (amountTendered ? amountTendered - totalAmount : null);
+  const customerType = order.customerType || null;
 
   return (
     <AnimatePresence>
@@ -78,12 +92,44 @@ const SaleDetailModal = ({ isOpen, onClose, sale }) => {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">Payment Details</h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2 text-sm mb-4">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Subtotal</span>
+                    <span>₱{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {discount > 0 && (
+                    <div className="flex justify-between text-green-700 font-medium">
+                      <span>Discount {customerType ? `(${customerType} 20%)` : ""}</span>
+                      <span>-₱{discount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-emerald-700 font-medium">
+                    <span>Service Charge (10%)</span>
+                    <span>+₱{serviceCharge.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold border-t border-emerald-200 pt-2">
+                    <span>Total</span>
+                    <span className="text-green-600">₱{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  {amountTendered != null && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Amount Tendered</span>
+                      <span>₱{Number(amountTendered).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {change != null && change >= 0 && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Change</span>
+                      <span>₱{Number(change).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm border-t border-emerald-200 pt-4">
                   <div>
                     <span className="text-gray-500">Method:</span>
                     <div className={`font-semibold px-3 py-1 rounded-full mt-1 inline-block ${
-                      sale.paymentMethod === 'CASH' 
-                        ? 'bg-green-100 text-green-800' 
+                      sale.paymentMethod === 'CASH'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-blue-100 text-blue-800'
                     }`}>
                       {sale.paymentMethod}
@@ -97,28 +143,28 @@ const SaleDetailModal = ({ isOpen, onClose, sale }) => {
                       </div>
                     </div>
                   )}
-                  <div className="md:col-span-2">
-                    <span className="text-gray-500">Total Amount:</span>
-                    <div className="text-2xl font-bold text-green-600 mt-1">
-                      ₱{sale.totalAmount.toLocaleString()}
-                    </div>
-                  </div>
                 </div>
               </div>
 
               {/* Additional Info */}
-              {(sale.user || sale.table) && (
+              {(user || table) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-xl">
-                  {sale.user && (
+                  {user && (
                     <div>
                       <span className="text-gray-500 block mb-1">User:</span>
-                      <span className="font-medium">{sale.user.name}</span>
+                      <span className="font-medium">{user.name}</span>
                     </div>
                   )}
-                  {sale.table && (
+                  {table && (
                     <div>
                       <span className="text-gray-500 block mb-1">Table:</span>
-                      <span className="font-medium">Table {sale.table.number}</span>
+                      <span className="font-medium">Table {table.number}</span>
+                    </div>
+                  )}
+                  {customerType && customerType !== 'REGULAR' && (
+                    <div>
+                      <span className="text-gray-500 block mb-1">Customer Type:</span>
+                      <span className="font-medium">{customerType}</span>
                     </div>
                   )}
                 </div>

@@ -662,7 +662,7 @@ useEffect(() => {
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     <td className="py-3 sm:py-4 px-2 sm:px-4 font-bold text-indigo-600 text-xs sm:text-sm whitespace-nowrap cursor-pointer hover:underline" onClick={() => openSaleDetail(sale.id)}>
-                      #{sale.id.slice(-8).toUpperCase()}
+                      #{sale.order?.orderNumber || sale.id.slice(-8).toUpperCase()}
                     </td>
                     <td className="py-3 sm:py-4 px-2 sm:px-4 font-medium text-gray-900 text-xs sm:text-sm whitespace-nowrap">
                       {new Date(sale.createdAt).toLocaleDateString()}{" "}
@@ -671,10 +671,10 @@ useEffect(() => {
                       </span>
                     </td>
                     <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm whitespace-nowrap">
-                      {sale.user?.name || "N/A"}
+                      {sale.order?.user?.name || sale.user?.name || "N/A"}
                     </td>
                     <td className="py-3 sm:py-4 px-2 sm:px-4 text-gray-700 text-xs sm:text-sm whitespace-nowrap">
-                      {sale.table ? `Table ${sale.table.number}` : "Takeaway"}
+                      {sale.order?.table ? `Table ${sale.order.table.number}` : sale.table ? `Table ${sale.table.number}` : "Takeaway"}
                     </td>
                     <td className="py-3 sm:py-4 px-2 sm:px-4 text-center">
                       <span

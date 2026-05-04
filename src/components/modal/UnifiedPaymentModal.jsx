@@ -42,6 +42,7 @@ const UnifiedPaymentModal = ({
       const catName = (
         item.category?.name ||
         item.product?.category?.name ||
+        item.product?.categoryId ||
         item.categoryId ||
         ''
       ).toLowerCase().replace(/\s+/g, '-');
@@ -81,12 +82,19 @@ const UnifiedPaymentModal = ({
 
   const total = breakdown.total;
 
+  // Reset amount tendered when customer type changes so auto-fill re-triggers
+  useEffect(() => {
+    if (autoFill) {
+      setAmountTendered("");
+    }
+  }, [customerType]);
+
   // Auto-fill amount for CASH
   useEffect(() => {
     if (autoFill && paymentMethod === "CASH" && total > 0 && amountTendered === "") {
       setAmountTendered(total.toFixed(2));
     }
-  }, [total, autoFill, paymentMethod]);
+  }, [total, autoFill, paymentMethod, amountTendered]);
 
   // CHANGE CALC
   const changeAmount = useMemo(() => {

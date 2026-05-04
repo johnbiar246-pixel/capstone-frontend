@@ -218,6 +218,9 @@ const Orders = () => {
 
       showNotification("Order accepted");
       setShowUnifiedModal(false);
+      // Show receipt for the accepted order
+      setSelectedReceiptOrderId(selectedOrderForPayment.id);
+      setShowReceiptModal(true);
       setSelectedOrderForPayment(null);
       fetchOrders();
     } catch {

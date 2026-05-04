@@ -30,10 +30,12 @@ export const OrdersProvider = ({ children }) => {
           id: order.id.toString(),
           orderNumber: order.orderNumber,
           status: order.status?.toLowerCase(),
+          customerType: order.customerType || "REGULAR",
           totalAmount: Number(order.totalAmount ?? 0),
           serviceCharge: Number(order.serviceCharge ?? 0),
           amountTendered: Number(order.amountTendered ?? 0),
           paymentMethod: order.paymentMethod,
+          table: order.table || null,
           tableNumber: order.table?.number || "N/A",
           time: new Date(order.createdAt).toLocaleTimeString(),
           orderItems: order.orderItems.map((i) => ({
@@ -63,10 +65,11 @@ export const OrdersProvider = ({ children }) => {
     status,
     paymentMethod = null,
     referenceNo = null,
-    amountTendered = null
+    amountTendered = null,
+    customerType = null
   ) => {
     try {
-      const result = await updateOrderStatusApi(orderId, status, paymentMethod, referenceNo, amountTendered);
+      const result = await updateOrderStatusApi(orderId, status, paymentMethod, referenceNo, amountTendered, customerType);
       // Refresh orders after status update
       await fetchOrders();
       return result;
