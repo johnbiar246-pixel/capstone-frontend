@@ -28,7 +28,10 @@ export const CartProvider = ({ children }) => {
             item.name &&
             typeof item.price === 'number' &&
             typeof item.quantity === 'number' && item.quantity > 0
-          );
+          ).map(item => ({
+            ...item,
+            uniqueId: item.uniqueId || crypto.randomUUID()
+          }));
           return validCart;
         } catch (error) {
           console.warn('Failed to parse cart from localStorage:', error);
@@ -80,18 +83,16 @@ export const CartProvider = ({ children }) => {
 
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => 
-        item.id === product.id || 
-        item._id === product._id || 
-        item.productId === product.productId
+        item.name === product.name && item.price === product.price
       );
       if (existingItem) {
         return prevCart.map((item) =>
-          (item.id === product.id || item._id === product._id || item.productId === product.productId)
+          item.name === product.name && item.price === product.price
             ? { ...item, quantity: item.quantity + 1 }
             : item,
         );
       }
-      return [...prevCart, { ...product, quantity: 1 }];
+      return [...prevCart, { ...product, quantity: 1, uniqueId: crypto.randomUUID() }];
     });
   };
 
@@ -133,20 +134,18 @@ export const CartProvider = ({ children }) => {
   const cartBreakdown = useMemo(() => calculateCartBreakdown(cart), [calculateCartBreakdown, cart]);
   const getCartTotal = () => cartBreakdown.total;
 
-  const removeFromCart = (productId) => {
-    setCart((prevCart) => prevCart.filter((item) => 
-      !(item.id === productId || item._id === productId || item.productId === productId)
-    ));
+  const removeFromCart = (uniqueId) => {
+    setCart((prevCart) => prevCart.filter((item) => item.uniqueId !== uniqueId));
   };
 
-  const updateQuantity = (productId, quantity) => {
+  const updateQuantity = (uniqueId, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(uniqueId);
       return;
     }
     setCart((prevCart) =>
       prevCart.map((item) =>
-        (item.id === productId || item._id === productId || item.productId === productId)
+        item.uniqueId === uniqueId
           ? { ...item, quantity } 
           : item,
       ),

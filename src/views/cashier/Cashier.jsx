@@ -298,7 +298,7 @@ const handleUnifiedConfirm = async (total, paymentDetails) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <motion.button
-                        onClick={() => updateQuantity(item.id, -1)}
+                        onClick={() => updateQuantity(item.uniqueId, item.quantity - 1)}
                         whileHover={{ scale: 1.1 }}
                       >
                         <MdRemove className="text-xl text-gray-500 hover:text-red-500" />
@@ -307,13 +307,13 @@ const handleUnifiedConfirm = async (total, paymentDetails) => {
                         {item.quantity}
                       </span>
                       <motion.button
-                        onClick={() => updateQuantity(item.id, 1)}
+                        onClick={() => updateQuantity(item.uniqueId, item.quantity + 1)}
                         whileHover={{ scale: 1.1 }}
                       >
                         <MdAdd className="text-xl text-emerald-500 hover:text-emerald-600" />
                       </motion.button>
                       <motion.button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item.uniqueId)}
                         whileHover={{ scale: 1.1 }}
                       >
                         <MdDelete className="text-xl text-red-500 hover:text-red-600" />
