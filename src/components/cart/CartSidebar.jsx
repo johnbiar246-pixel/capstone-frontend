@@ -104,15 +104,14 @@ const CartSidebar = () => {
 
   // SAFE KEY GENERATOR (FIXED BUG HERE)
   const getSafeKey = (item, index) => {
-    // Create a unique key using multiple fallbacks
+    // Use uniqueId if available, otherwise fallback
+    if (item.uniqueId) {
+      return `item-${item.uniqueId}`;
+    }
+    // Fallback to old logic
     const id = item?.id || item?._id || item?.productId;
     const name = item?.name || 'unknown';
     const price = item?.price || 0;
-
-    // Use crypto.randomUUID if available, otherwise use timestamp + random
-    const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `fallback-${Date.now()}-${Math.random()}`;
 
     // If we have a valid ID, use it
     if (id && typeof id === 'string' && id.trim()) {
@@ -120,7 +119,7 @@ const CartSidebar = () => {
     }
 
     // Fallback with unique identifier
-    return `item-${name}-${price}-${index}-${uniqueId}`;
+    return `item-${name}-${price}-${index}`;
   };
 
   return (
@@ -265,7 +264,7 @@ const CartSidebar = () => {
                         <div className="flex items-center gap-2 mt-2">
                           <button
                             onClick={() =>
-                              updateQuantity(item.id, item.quantity - 1)
+                              updateQuantity(item.uniqueId, item.quantity - 1)
                             }
                             className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
                           >
@@ -278,7 +277,7 @@ const CartSidebar = () => {
 
                           <button
                             onClick={() =>
-                              updateQuantity(item.id, item.quantity + 1)
+                              updateQuantity(item.uniqueId, item.quantity + 1)
                             }
                             className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
                           >
@@ -289,7 +288,7 @@ const CartSidebar = () => {
 
                       {/* DELETE */}
                       <button
-                        onClick={() => removeFromCart(item.id)}
+                        onClick={() => removeFromCart(item.uniqueId)}
                         className="text-red-500 p-2"
                       >
                         <MdDelete />
