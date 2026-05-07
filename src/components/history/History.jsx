@@ -19,6 +19,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useSales } from "../../contexts/SalesContext.jsx";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 import SaleDetailModal from "../modal/SaleDetailModal.jsx";
 import { useMemo } from "react";
 import { MdClear, MdCalendarToday, MdSort, MdPayments } from "react-icons/md";
@@ -81,6 +82,7 @@ const History = () => {
   const [modalLoading, setModalLoading] = useState(false);
 
   const { fetchSales: loadSales, fetchSaleDetail: loadSaleDetail } = useSales();
+  const { isAdmin } = useAuth();
 
   const isValidDates =
     !filters.dateFrom ||
@@ -113,8 +115,11 @@ const fetchSaleDetail = async (saleId) => {
     setIsLoading(true);
     setError(null);
     try {
-      const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
-      const params = { ...(userId && { userId }) };
+      const params = {};
+      if (!isAdmin) {
+        const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+        if (userId) params.userId = userId;
+      }
       if (filters.dateFrom) params.dateFrom = filters.dateFrom;
       if (filters.dateTo) params.dateTo = filters.dateTo;
 
@@ -125,17 +130,21 @@ const fetchSaleDetail = async (saleId) => {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.dateFrom, filters.dateTo, loadSales]);
+  }, [filters.dateFrom, filters.dateTo, isAdmin, loadSales]);
 
   const fetchAllSales = useCallback(async () => {
     try {
-      const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
-      const sales = await loadSales({ ...(userId && { userId }) });
+      const params = {};
+      if (!isAdmin) {
+        const userId = localStorage.getItem("userId") || sessionStorage.getItem("userId");
+        if (userId) params.userId = userId;
+      }
+      const sales = await loadSales(params);
       setAllSales(Array.isArray(sales) ? sales : []);
     } catch (err) {
       console.error("FETCH ALL SALES ERROR:", err);
     }
-  }, [loadSales]);
+  }, [isAdmin, loadSales]);
 
   const handleManualRefresh = useCallback(async () => {
     setIsManualRefreshing(true);
